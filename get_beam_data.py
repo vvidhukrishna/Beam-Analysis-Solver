@@ -1,8 +1,13 @@
+from beam import Beam, PointLoad, AppliedMoment, Support, PINNED, ROLLER
+
+
 def make_float_list(prompt_text: str) -> list[float]:
+    """Helper to parse a comma-separated string of user input into floats."""
     raw_input = input(prompt_text).strip()
     if not raw_input:
         return []
     return [float(val.strip()) for val in raw_input.split(",")]
+
 
 def validate_beam_inputs(
     number_of_supports: int,
@@ -12,44 +17,39 @@ def validate_beam_inputs(
     point_loads: list[float],
     moments: list[float],
 ) -> None:
-
-    # 1. Check matching dimensions across load arrays
+    """Validates raw numerical user inputs before assembling the Beam structure."""
     if not points:
         raise ValueError("Points list cannot be empty.")
 
     if len(points) != len(point_loads) or len(points) != len(moments):
         raise ValueError("Mismatch in dimensions: 'points', 'point_loads', and 'moments' must have equal length.")
 
-    # Calculate total beam length based on maximum load coordinate
     beam_length = max(points)
 
-    # 2. Validation: number_of_supports == 2 (Version 1)
     if number_of_supports != 2:
         raise ValueError(f"Version 1 only supports exactly 2 supports, got {number_of_supports}.")
 
-    # 3. Validation: beam_length > 0
     if beam_length <= 0:
         raise ValueError(f"Beam length must be greater than 0, got {beam_length}.")
 
-    # 4. Validation: 0 <= x_support_A < beam_length
     if not (0 <= x_support_A < beam_length):
         raise ValueError(f"Support A (x = {x_support_A}) must satisfy 0 <= x_support_A < beam_length ({beam_length}).")
 
-    # 5. Validation: 0 <= x_support_B <= beam_length
     if not (0 <= x_support_B <= beam_length):
         raise ValueError(f"Support B (x = {x_support_B}) must satisfy 0 <= x_support_B <= beam_length ({beam_length}).")
 
-    # 6. Validation: x_support_A != x_support_B
     if x_support_A == x_support_B:
         raise ValueError(f"Support A and Support B cannot be at the same location (x = {x_support_A}).")
 
-    # 7. Validation: Every load lies between 0 and beam_length
     for p in points:
         if not (0 <= p <= beam_length):
             raise ValueError(f"Load/moment location at x = {p} must lie between 0 and beam_length ({beam_length}).")
 
-def get_beam_data(interactive: bool = True) -> dict:
 
+def get_beam_data(interactive: bool = True) -> Beam:
+    """
+    Prompts or uses default test data to instantiate and return a populated Beam object.
+    """
     print("--- Beam Data Input ---")
     print("Sign Convention:")
     print("  • Positive x : right")
@@ -72,7 +72,6 @@ def get_beam_data(interactive: bool = True) -> dict:
         except ValueError as e:
             raise ValueError(f"Invalid numeric input provided: {e}") from e
     else:
-        # Default test data matching your script
         number_of_supports = 2
         points = [0.0, 3.0, 4.5, 6.0]
         point_loads = [0.0, -60.0, -45.0, 0.0]
@@ -80,7 +79,7 @@ def get_beam_data(interactive: bool = True) -> dict:
         x_support_A = points[0]
         x_support_B = points[-1]
 
-    # Validate inputs
+    # Validate raw inputs
     validate_beam_inputs(
         number_of_supports,
         x_support_A,
@@ -90,11 +89,18 @@ def get_beam_data(interactive: bool = True) -> dict:
         moments,
     )
 
-    return {
-        "number_of_supports": number_of_supports,
-        "x_support_A": x_support_A,
-        "x_support_B": x_support_B,
-        "points": points,
-        "point_loads": point_loads,
-        "moments": moments,
-    }
+    # Instantiate Beam object
+    beam = Beam(length=max(points))
+
+    # Populate loads and moments via beam.add_event()
+    for x, load, moment in zip(points, point_loads, moments):
+        if load != 0.0:
+            beam.add_event(x, PointLoad(force=load))
+        if moment != 0.0:
+            beam.add_event(x, AppliedMoment(moment=moment))
+
+    # Attach supports via beam.add_event()
+    beam.add_event(x_support_A, Support(support_type=PINNED))
+    beam.add_event(x_support_B, Support(support_type=ROLLER))
+
+    return beam

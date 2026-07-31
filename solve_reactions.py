@@ -1,8 +1,12 @@
 from beam import Beam, PointLoad, AppliedMoment, Support, Reaction, TOLERANCE
 
 
-def calculate_reactions(beam: Beam) -> Beam:
-    # Extracting support points from the beam object
+def solve_reactions(beam: Beam) -> None:
+    """
+    Computes support reaction forces using static equilibrium equations
+    and directly attaches Reaction events to the corresponding support points in the Beam.
+    """
+    # 1. Extract support points from the beam object
     support_points = []
     for pt in beam.points:
         for event in pt.events:
@@ -20,7 +24,11 @@ def calculate_reactions(beam: Beam) -> Beam:
     x_B = pt_B.x
     span = x_B - x_A
 
-    # Computing moments about support A
+    # Defensive check: ensure supports are separated
+    if span <= TOLERANCE:
+        raise ValueError(f"Support span too small or overlapping supports (span = {span:.2e} m).")
+
+    # 2. Compute moments about support A
     M_applied_about_A = 0.0
     total_applied_force = 0.0
 
@@ -33,11 +41,14 @@ def calculate_reactions(beam: Beam) -> Beam:
             elif isinstance(event, AppliedMoment):
                 M_applied_about_A += event.moment
 
-    # Applying equilibrium equations
+    # 3. Apply equilibrium equations
+    # ΣM_A = 0 => M_applied_about_A + R_B * span = 0
     R_B = -M_applied_about_A / span
+
+    # ΣFy = 0 => R_A + R_B + total_applied_force = 0
     R_A = -total_applied_force - R_B
 
-    # Equilibrium Check about support B
+    # 4. Equilibrium Check about support B
     M_about_B = -R_A * span
     for pt in beam.points:
         arm_B = pt.x - x_B
@@ -54,8 +65,6 @@ def calculate_reactions(beam: Beam) -> Beam:
             f"Equilibrium check failed! Force error: {force_balance:.2e}, Moment error: {M_about_B:.2e}"
         )
 
-    # Attaching Reaction events directly to the support points
-    pt_A.add_event(Reaction(force=R_A))
-    pt_B.add_event(Reaction(force=R_B))
-
-    return beam
+    # 5. Attach Reaction events directly via beam.add_event()
+    beam.add_event(x_A, Reaction(force=R_A))
+    beam.add_event(x_B, Reaction(force=R_B))

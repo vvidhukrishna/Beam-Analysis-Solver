@@ -1,22 +1,27 @@
-from calculate_reactions import calculate_reactions
 from get_beam_data import get_beam_data
+from solve_reactions import solve_reactions
+from beam import Support, Reaction
 
 
-def main():
-    # Prompt user for interaction choice or use defaults
-    mode = (input("Run interactive mode? (y/n, press Enter for default test data): ").strip().lower())
+def main() -> None:
+    """Main execution flow for gathering input, solving reactions, and outputting results."""
+    mode = input("Run interactive mode? (y/n, press Enter for default test data): ").strip().lower()
     interactive = mode == "y"
 
-    # Collect and validate beam input data
-    beam_data = get_beam_data(interactive=interactive)
+    # Collect input and create Beam object structure
+    beam = get_beam_data(interactive=interactive)
 
-    # Calculate reactions and validate equilibrium
-    reactions = calculate_reactions(beam_data)
+    # Solve reaction forces and attach Reaction events directly to the Beam
+    solve_reactions(beam)
 
-    # Print results
+    # Print results from the data structure
     print("\nComputed Reaction Forces:")
-    print(f"  Reaction R_A at x = {reactions['x_support_A']:.2f} m : {reactions['R_A']:.4f} kN")
-    print(f"  Reaction R_B at x = {reactions['x_support_B']:.2f} m : {reactions['R_B']:.4f} kN")
+    for pt in beam.points:
+        has_support = any(isinstance(e, Support) for e in pt.events)
+        if has_support:
+            for event in pt.events:
+                if isinstance(event, Reaction):
+                    print(f"  Reaction force at x = {pt.x:.2f} m : {event.force:.4f} kN")
 
 
 if __name__ == "__main__":
