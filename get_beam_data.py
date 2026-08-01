@@ -74,7 +74,7 @@ def get_beam_data(interactive: bool = True) -> Beam:
     else:
         number_of_supports = 2
         points = [0.0, 3.0, 4.5, 6.0]
-        point_loads = [0.0, -60.0, -45.0, 0.0]
+        point_loads = [10.0, 0.0, 0.0, 0.0]
         moments = [0.0, 5.0, 15.0, 0.0]
         x_support_A = points[0]
         x_support_B = points[-1]
