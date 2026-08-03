@@ -21,8 +21,11 @@ class PointLoad(Event):
 
 
 class AppliedMoment(Event):
-    """Represents a concentrated moment acting at a point."""
-
+    """
+    Positive applied moment:
+    Counter-clockwise.
+    Positive value follows the project sign convention.
+    """
     def __init__(self, moment: float):
         self.moment = moment
 

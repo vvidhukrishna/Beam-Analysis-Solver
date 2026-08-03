@@ -73,11 +73,11 @@ def get_beam_data(interactive: bool = True) -> Beam:
             raise ValueError(f"Invalid numeric input provided: {e}") from e
     else:
         number_of_supports = 2
-        points = [0.0, 3.0, 4.5, 6.0]
-        point_loads = [10.0, 0.0, 0.0, 0.0]
-        moments = [0.0, 5.0, 15.0, 0.0]
+        points = [0.0, 2.5, 4.0, 5.0, 6.0]
+        point_loads = [0.0, -20.0, -15.0, 0.0, -10.0]
+        moments = [0.0, 10.0, -15.0, 0.0, 0.0]
         x_support_A = points[0]
-        x_support_B = points[-1]
+        x_support_B = points[-2]
 
     # Validate raw inputs
     validate_beam_inputs(
