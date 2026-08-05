@@ -1,12 +1,12 @@
 TOLERANCE = 1e-6
 
-# *********     SUPPORT TYPE CONSTANTS     **********
+# ********* SUPPORT TYPE CONSTANTS **********
 PINNED = "pinned"
 ROLLER = "roller"
 FIXED = "fixed"
 
 
-# *********     EVENTS     **********
+# ********* EVENTS **********
 
 class Event:
     """Base class for any physical event at a location."""
@@ -22,8 +22,7 @@ class PointLoad(Event):
 
 class AppliedMoment(Event):
     """
-    Positive applied moment:
-    Counter-clockwise.
+    Positive applied moment: Counter-clockwise.
     Positive value follows the project sign convention.
     """
     def __init__(self, moment: float):
@@ -44,7 +43,7 @@ class Support(Event):
         self.support_type = support_type
 
 
-# *********     POINTS     **********
+# ********* POINTS **********
 
 class Point:
     """Represents a specific x-coordinate along the beam where events occur."""
@@ -58,7 +57,7 @@ class Point:
         self.events.append(event)
 
 
-# *********     BEAM     **********
+# ********* BEAM **********
 
 class Beam:
     """
@@ -81,9 +80,26 @@ class Beam:
         return new_p
 
     def add_event(self, x: float, event: Event) -> None:
-        """
-        High-level wrapper to attach an Event at coordinate x.
-        Encapsulates Point retrieval and creation within Beam.
-        """
+        """High-level wrapper to attach an Event at coordinate x."""
         point = self.get_or_create_point(x)
         point.add_event(event)
+
+    # --- HELPER TRAVERSAL METHODS ---
+
+    def iter_events(self):
+        """Yields (point, event) pairs across the entire beam."""
+        for point in self.points:
+            for event in point.events:
+                yield point, event
+
+    def support_points(self) -> list[Point]:
+        """Returns all points containing a Support event."""
+        return [pt for pt in self.points if any(isinstance(e, Support) for e in pt.events)]
+
+    def point_loads(self) -> list[tuple[float, PointLoad]]:
+        """Returns all (x, PointLoad) tuples across the beam."""
+        return [(pt.x, e) for pt, e in self.iter_events() if isinstance(e, PointLoad)]
+
+    def applied_moments(self) -> list[tuple[float, AppliedMoment]]:
+        """Returns all (x, AppliedMoment) tuples across the beam."""
+        return [(pt.x, e) for pt, e in self.iter_events() if isinstance(e, AppliedMoment)]
