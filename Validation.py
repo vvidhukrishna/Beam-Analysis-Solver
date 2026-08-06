@@ -28,20 +28,46 @@ def validate_points(points_str: str) -> list[float]:
 
 
 def validate_float_list(raw_input: str, expected_length: int, label: str) -> list[float]:
-    """Parses float list and ensures it matches points array length."""
+    """Parses float list and ensures length matches points array."""
     raw_input = raw_input.strip()
     if not raw_input:
         return [0.0] * expected_length
 
     vals = [float(val.strip()) for val in raw_input.split(",")]
     if len(vals) != expected_length:
-        raise ValueError(f"Length mismatch! Expected {expected_length} values for {label}, but got {len(vals)}.")
+        raise ValueError(
+            f"Length mismatch! Expected {expected_length} values for {label}, but got {len(vals)}."
+        )
 
     return vals
 
 
+def validate_udl_count(raw_str: str) -> int:
+    """Validates UDL count."""
+    count = int(raw_str.strip() or "0")
+    if count < 0:
+        raise ValueError("UDL count cannot be negative.")
+    return count
+
+
+def validate_udl_spec(raw_str: str, beam_length: float) -> tuple[float, float, float]:
+    """Parses single UDL string: 'start_x, end_x, intensity'."""
+    parts = [float(p.strip()) for p in raw_str.split(",")]
+    if len(parts) != 3:
+        raise ValueError("UDL input requires exactly 3 values: start_x, end_x, intensity")
+
+    start_x, end_x, intensity = parts
+
+    if not (0 <= start_x < end_x <= beam_length):
+        raise ValueError(
+            f"Invalid UDL bounds ({start_x}m to {end_x}m). Must satisfy 0 <= start_x < end_x <= {beam_length}m."
+        )
+
+    return start_x, end_x, intensity
+
+
 def validate_support_location(
-        loc_str: str, default: float, beam_length: float, support_name: str
+    loc_str: str, default: float, beam_length: float, support_name: str
 ) -> float:
     """Validates support position relative to beam span."""
     val = float(loc_str) if loc_str.strip() else default
@@ -51,24 +77,6 @@ def validate_support_location(
 
 
 def validate_support_separation(x_A: float, x_B: float) -> None:
-    """Checks that support A and support B are not at the exact same location."""
-    if x_A == x_B:
+    """Checks that supports A and B are distinct."""
+    if abs(x_A - x_B) < TOLERANCE:
         raise ValueError(f"Support B cannot be at the exact same location as Support A (x = {x_A}m).")
-
-
-def validate_equilibrium(beam: Beam, R_A: float, R_B: float, x_A: float, x_B: float) -> None:
-    """Sanity check to confirm sum of vertical forces and moments equal zero."""
-    span = x_B - x_A
-    total_loads = sum(load.force for _, load in beam.point_loads())
-    force_balance = R_A + R_B + total_loads
-
-    M_about_B = -R_A * span
-    for x, load in beam.point_loads():
-        M_about_B += (x - x_B) * load.force
-    for _, moment in beam.applied_moments():
-        M_about_B += moment.moment
-
-    if abs(force_balance) > TOLERANCE or abs(M_about_B) > TOLERANCE:
-        raise RuntimeError(
-            f"Equilibrium check failed! Force error: {force_balance:.2e}, Moment error: {M_about_B:.2e}"
-        )
