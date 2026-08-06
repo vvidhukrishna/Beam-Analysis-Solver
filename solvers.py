@@ -1,83 +1,125 @@
-from beam import Beam, PointLoad, Reaction, AppliedMoment, Support, TOLERANCE
-from Validation import validate_equilibrium
+import numpy as np
+from beam import Beam, Reaction, PointLoad, AppliedMoment, Support, UniformDistributedLoad, TOLERANCE
 
 
-def solve_reactions(beam: Beam) -> None:
-    """Computes support reactions using static equilibrium equations."""
-    supports = beam.support_points()
+def solve_reactions(beam: Beam) -> tuple[float, float, float, float]:
+    """
+    Solves reaction forces R_A and R_B for simply supported beam with 2 supports.
+    Includes Point Loads, Applied Moments, and UDLs.
+    Returns: (x_A, R_A, x_B, R_B)
+    """
+    beam.clear_reactions()
+    
+    supports = list(beam.supports())
     if len(supports) != 2:
-        raise ValueError(f"Expected exactly 2 supports, found {len(supports)}")
+        raise ValueError(f"Solver requires exactly 2 supports, found {len(supports)}.")
 
-    supports.sort(key=lambda p: p.x)
-    pt_A, pt_B = supports[0], supports[1]
-    x_A, x_B = pt_A.x, pt_B.x
+    (x_A, _), (x_B, _) = supports[0], supports[1]
     span = x_B - x_A
 
-    if span <= TOLERANCE:
-        raise ValueError(f"Support span too small or overlapping supports (span = {span:.2e} m).")
+    if abs(span) < TOLERANCE:
+        raise ValueError("Support separation distance cannot be zero.")
 
-    # Sum moments about support A: ΣM_A = 0
-    M_applied_about_A = sum((x - x_A) * load.force for x, load in beam.point_loads())
-    M_applied_about_A += sum(moment.moment for _, moment in beam.applied_moments())
+    # 1. Total applied vertical forces
+    F_point_total = sum(load.force for _, load in beam.point_loads())
+    F_udl_total = sum(udl.resultant_force for udl in beam.udls())
+    F_applied_total = F_point_total + F_udl_total
 
-    # Calculate reaction forces
-    R_B = -M_applied_about_A / span
-    total_force = sum(load.force for _, load in beam.point_loads())
-    R_A = -total_force - R_B
+    # 2. Sum of moments about Support A (\sum M_A = 0)
+    # Applied point moments
+    M_applied = sum(m.moment for _, m in beam.applied_moments())
 
-    # Validate equilibrium math
-    validate_equilibrium(beam, R_A, R_B, x_A, x_B)
+    # Moments from point loads: F * (x - x_A)
+    M_point_loads = sum(load.force * (x - x_A) for x, load in beam.point_loads())
 
-    # Attach reactions to beam
+    # Moments from UDLs: F_equiv * (x_centroid - x_A)
+    M_udl_loads = sum(udl.resultant_force * (udl.centroid_x - x_A) for udl in beam.udls())
+
+    M_total_about_A = M_applied + M_point_loads + M_udl_loads
+
+    # Equilibrium equations:
+    #   \sum M_A = 0 => R_B * (x_B - x_A) + M_total_about_A = 0
+    #   \sum F_y = 0 => R_A + R_B + F_applied_total = 0
+    R_B = -M_total_about_A / span
+    R_A = -(F_applied_total + R_B)
+
+    # Attach reaction events to beam model
     beam.add_event(x_A, Reaction(force=R_A))
     beam.add_event(x_B, Reaction(force=R_B))
 
-
-def calculate_sfd(beam: Beam) -> list[tuple[float, float]]:
-    """Calculates Shear Force Diagram (SFD) coordinates."""
-    sfd_data: list[tuple[float, float]] = []
-    current_shear = 0.0
-
-    for pt in beam.points:
-        sfd_data.append((pt.x, current_shear))
-
-        for event in pt.events:
-            if isinstance(event, (PointLoad, Reaction)):
-                current_shear += event.force
-
-        sfd_data.append((pt.x, current_shear))
-
-    return sfd_data
+    return x_A, R_A, x_B, R_B
 
 
-def calculate_bmd(beam: Beam) -> list[tuple[float, float]]:
-    """Calculates Bending Moment Diagram (BMD) coordinates."""
-    if not beam.points:
-        return []
+def calculate_sfd_bmd(beam: Beam, num_samples: int = 1000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Calculates Shear Force (V) and Bending Moment (M) along beam using dense integration.
+    Handles step discontinuities from point forces/moments and quadratic curves from UDLs.
+    Returns: (x_array, shear_force_array, bending_moment_array)
+    """
+    # Build evaluation x-grid including epsilons around discrete points to capture sharp jumps
+    critical_x = {p.x for p in beam.points}
+    for dev in beam.distributed_events:
+        critical_x.add(dev.start_x)
+        critical_x.add(dev.end_x)
 
-    bmd_data: list[tuple[float, float]] = []
-    current_moment = 0.0
-    current_shear = 0.0
-    current_x = beam.points[0].x
+    extra_pts = []
+    for cx in critical_x:
+        if cx > 0:
+            extra_pts.append(cx - 1e-7)
+        if cx < beam.length:
+            extra_pts.append(cx + 1e-7)
 
-    for pt in beam.points:
-        dx = pt.x - current_x
-        current_moment += current_shear * dx
-        bmd_data.append((pt.x, current_moment))
+    base_grid = np.linspace(0, beam.length, num_samples)
+    x_all = np.unique(np.sort(np.concatenate([base_grid, list(critical_x), extra_pts])))
 
-        has_applied_moment = False
-        for event in pt.events:
-            if isinstance(event, AppliedMoment):
-                current_moment -= event.moment
-                has_applied_moment = True
+    shear_force = np.zeros_like(x_all)
+    bending_moment = np.zeros_like(x_all)
 
-        if has_applied_moment:
-            bmd_data.append((pt.x, current_moment))
+    # Collect all point forces (Point loads + Support Reactions)
+    point_forces: list[tuple[float, float]] = []
+    for x, load in beam.point_loads():
+        point_forces.append((x, load.force))
+    for p in beam.points:
+        for ev in p.events:
+            if isinstance(ev, Reaction):
+                point_forces.append((p.x, ev.force))
 
-        for event in pt.events:
-            if isinstance(event, (PointLoad, Reaction)):
-                current_shear += event.force
+    applied_moments = [(x, m.moment) for x, m in beam.applied_moments()]
+    udls = list(beam.udls())
 
-        current_x = pt.x
+    for idx, x in enumerate(x_all):
+        # 1. Shear Force V(x) = Sum of all vertical forces to the left of section x
+        V_pt = sum(f for px, f in point_forces if px <= x)
 
-    return bmd_data
+        V_udl = 0.0
+        for udl in udls:
+            if x <= udl.start_x:
+                continue
+            elif x >= udl.end_x:
+                V_udl += udl.resultant_force
+            else:
+                # Partially active UDL region
+                active_len = x - udl.start_x
+                V_udl += udl.intensity * active_len
+
+        shear_force[idx] = V_pt + V_udl
+
+        # 2. Bending Moment M(x) = Sum of moments of forces & moments to the left of x
+        M_pt_forces = sum(f * (x - px) for px, f in point_forces if px <= x)
+        M_pt_moments = sum(m for px, m in applied_moments if px <= x)
+
+        M_udl = 0.0
+        for udl in udls:
+            if x <= udl.start_x:
+                continue
+            elif x >= udl.end_x:
+                M_udl += udl.resultant_force * (x - udl.centroid_x)
+            else:
+                active_len = x - udl.start_x
+                active_force = udl.intensity * active_len
+                active_centroid = udl.start_x + (active_len / 2.0)
+                M_udl += active_force * (x - active_centroid)
+
+        bending_moment[idx] = M_pt_forces + M_pt_moments + M_udl
+
+    return x_all, shear_force, bending_moment

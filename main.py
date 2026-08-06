@@ -1,26 +1,27 @@
 from get_beam_data import get_beam_data
-from solvers import solve_reactions, calculate_sfd, calculate_bmd
-from plotting import plot_sfd, plot_bmd
+from solvers import solve_reactions, calculate_sfd_bmd
+from plotting import plot_beam_results
 
 
-def main() -> None:
-    """Main execution flow for gathering input, solving reactions, and plotting SFD/BMD."""
-    mode = input("Run interactive mode? (y/n, press Enter for default test data): ").strip().lower()
-    interactive = mode == "y"
+def main():
+    try:
+        # 1. Get input data interactively
+        beam = get_beam_data(interactive=True)
 
-    # 1. Collect input and create Beam structure
-    beam = get_beam_data(interactive=interactive)
+        # 2. Solve support reactions
+        x_A, R_A, x_B, R_B = solve_reactions(beam)
+        print(f"  • Reaction R_A at x = {x_A:.2f} m : {R_A:.2f} kN")
+        print(f"  • Reaction R_B at x = {x_B:.2f} m : {R_B:.2f} kN\n")
 
-    # 2. Solve reaction forces
-    solve_reactions(beam)
+        # 3. Calculate SFD and BMD arrays
+        x_grid, V_grid, M_grid = calculate_sfd_bmd(beam)
 
-    # 3. Calculate SFD and BMD
-    sfd_points = calculate_sfd(beam)
-    bmd_points = calculate_bmd(beam)
+        # 4. Render plots
+        print("Rendering Shear Force and Bending Moment Diagrams...")
+        plot_beam_results(beam, x_grid, V_grid, M_grid)
 
-    # 4. Render plots
-    plot_sfd(sfd_points)
-    plot_bmd(bmd_points)
+    except Exception as e:
+        print(f"\n[Fatal Error] Could not complete analysis: {e}")
 
 
 if __name__ == "__main__":
