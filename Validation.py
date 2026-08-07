@@ -80,3 +80,22 @@ def validate_support_separation(x_A: float, x_B: float) -> None:
     """Checks that supports A and B are distinct."""
     if abs(x_A - x_B) < TOLERANCE:
         raise ValueError(f"Support B cannot be at the exact same location as Support A (x = {x_A}m).")
+
+def validate_uvl_count(raw_str: str) -> int:
+    count = int(raw_str.strip() or "0")
+    if count < 0:
+        raise ValueError("UVL count cannot be negative.")
+    return count
+
+def validate_uvl_spec(raw_str: str, beam_length: float) -> tuple[float, float, float, float]:
+    """Parses UVL string: 'start_x, end_x, w1, w2'."""
+    parts = [float(p.strip()) for p in raw_str.split(",")]
+    if len(parts) != 4:
+        raise ValueError("UVL input requires exactly 4 values: start_x, end_x, w1, w2")
+
+    start_x, end_x, w1, w2 = parts
+
+    if not (0 <= start_x < end_x <= beam_length):
+        raise ValueError(f"Invalid UVL bounds. Must satisfy 0 <= start_x < end_x <= {beam_length}m.")
+
+    return start_x, end_x, w1, w2
