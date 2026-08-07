@@ -23,6 +23,5 @@ def main():
     except Exception as e:
         print(f"\n[Fatal Error] Could not complete analysis: {e}")
 
-
 if __name__ == "__main__":
     main()
