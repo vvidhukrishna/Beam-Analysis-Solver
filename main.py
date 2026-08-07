@@ -6,7 +6,7 @@ from plotting import plot_beam_results
 def main():
     try:
         # 1. Get input data interactively
-        beam = get_beam_data(interactive=True)
+        beam = get_beam_data(interactive=False)
 
         # 2. Solve support reactions
         x_A, R_A, x_B, R_B = solve_reactions(beam)

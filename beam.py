@@ -35,25 +35,21 @@ class DistributedEvent(Event):
 # --- Point Events ---
 
 class PointLoad(PointEvent):
-    """Vertical force (kN). Downward is negative."""
     def __init__(self, force: float):
         self.force = force
 
 
 class AppliedMoment(PointEvent):
-    """Applied moment (kNm). Counter-clockwise is positive."""
     def __init__(self, moment: float):
         self.moment = moment
 
 
 class Reaction(PointEvent):
-    """Calculated support reaction force (kN)."""
     def __init__(self, force: float):
         self.force = force
 
 
 class Support(PointEvent):
-    """Physical support boundary condition."""
     def __init__(self, support_type: str):
         self.support_type = support_type
 
@@ -61,28 +57,45 @@ class Support(PointEvent):
 # --- Distributed Events ---
 
 class UniformDistributedLoad(DistributedEvent):
-    """Uniform Distributed Load (kN/m). Downward intensity is negative."""
-
     def __init__(self, start_x: float, end_x: float, intensity: float):
         super().__init__(start_x, end_x)
         self.intensity = intensity
 
     @property
     def resultant_force(self) -> float:
-        """Total equivalent point force (w * L)."""
         return self.intensity * self.span
 
     @property
     def centroid_x(self) -> float:
-        """Midpoint of the load distribution."""
         return self.start_x + (self.span / 2.0)
+
+
+class UniformVaryingLoad(DistributedEvent):
+    """Uniform Varying Load (kN/m) spanning start_x to end_x."""
+
+    def __init__(self, start_x: float, end_x: float, w1: float, w2: float):
+        super().__init__(start_x, end_x)
+        self.w1 = w1
+        self.w2 = w2
+
+    @property
+    def resultant_force(self) -> float:
+        """Area of trapezoid: ((w1 + w2) / 2) * L"""
+        return ((self.w1 + self.w2) / 2.0) * self.span
+
+    @property
+    def centroid_x(self) -> float:
+        """Centroid of trapezoid relative to start_x."""
+        if abs(self.w1 + self.w2) < TOLERANCE:
+            return self.start_x + (self.span / 2.0)
+
+        # Standard centroid formula for trapezoid/triangle
+        return self.start_x + (self.span / 3.0) * ((self.w1 + 2 * self.w2) / (self.w1 + self.w2))
 
 
 # --- Beam Structure ---
 
 class Point:
-    """Stores all PointEvents occurring at coordinate x."""
-
     def __init__(self, x: float):
         self.x = x
         self.events: list[PointEvent] = []
@@ -92,8 +105,6 @@ class Point:
 
 
 class Beam:
-    """Represents the complete beam model."""
-
     def __init__(self, length: float):
         self.length = length
         self.points: list[Point] = []
@@ -117,7 +128,12 @@ class Beam:
         self.get_or_create_point(event.end_x)
         self.distributed_events.append(event)
 
-    # Helpers for iterating events
+    def clear_reactions(self) -> None:
+        for p in self.points:
+            p.events = [ev for ev in p.events if not isinstance(ev, Reaction)]
+
+    # --- Query Helpers ---
+
     def point_loads(self) -> Generator[tuple[float, PointLoad], None, None]:
         for p in self.points:
             for ev in p.events:
@@ -141,7 +157,19 @@ class Beam:
             if isinstance(dev, UniformDistributedLoad):
                 yield dev
 
-    def clear_reactions(self) -> None:
-        """Removes all Reaction events from every point on the beam."""
-        for p in self.points:
-            p.events = [ev for ev in p.events if not isinstance(ev, Reaction)]
+    def uvls(self) -> Generator[UniformVaryingLoad, None, None]:
+        for dev in self.distributed_events:
+            if isinstance(dev, UniformVaryingLoad):
+                yield dev
+
+    def equivalent_loads(self) -> Generator[tuple[float, float], None, None]:
+        """
+        Yields (x_location, force) for EVERY applied load on the beam.
+        This isolates the solver from caring about load shapes.
+        """
+        for x, load in self.point_loads():
+            yield x, load.force
+        for udl in self.udls():
+            yield udl.centroid_x, udl.resultant_force
+        for uvl in self.uvls():
+            yield uvl.centroid_x, uvl.resultant_force
