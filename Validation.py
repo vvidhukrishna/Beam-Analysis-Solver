@@ -5,7 +5,7 @@ def validate_support_count(count_str: str) -> int:
     """Validates support count input."""
     count = int(count_str)
     if count != 2:
-        raise ValueError(f"Version 1 only supports exactly 2 supports (got {count}).")
+        raise ValueError(f"Version 2 only supports exactly 2 supports (got {count}).")
     return count
 
 

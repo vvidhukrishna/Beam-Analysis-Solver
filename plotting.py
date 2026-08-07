@@ -16,13 +16,13 @@ def plot_beam_results(beam: Beam, x_grid: np.ndarray, V_grid: np.ndarray, M_grid
     ax_beam.set_ylim(-2.8, 2.8)
     ax_beam.set_yticks([])
     ax_beam.grid(True, linestyle="--", alpha=0.4)
-
-    # --- Draw UDLs ---
+    # --- Draw UDLs (Tier 1: Inner Load) ---
     for udl in beam.udls():
         is_downward = udl.intensity < 0
+        # Tier 1 sits close to the beam (0.08 to 0.48)
         box_bottom = 0.08 if is_downward else -0.48
 
-        rect = patches.Rectangle((udl.start_x, box_bottom), udl.span, 0.40, color="orange", alpha=0.25, zorder=1)
+        rect = patches.Rectangle((udl.start_x, box_bottom), udl.span, 0.40, color="orange", alpha=0.3, zorder=1)
         ax_beam.add_patch(rect)
 
         arrow_x_coords = np.linspace(udl.start_x, udl.end_x, num=max(3, int(udl.span * 2.5)))
@@ -34,16 +34,19 @@ def plot_beam_results(beam: Beam, x_grid: np.ndarray, V_grid: np.ndarray, M_grid
                 ax_beam.annotate("", xy=(ax_pos, -0.08), xytext=(ax_pos, -0.48),
                                  arrowprops=dict(arrowstyle="->", color="darkorange", lw=1.2), zorder=2)
 
+        # Label placed just above Tier 1
         label_y = 0.65 if is_downward else -0.65
         ax_beam.text(udl.centroid_x, label_y, f"w = {abs(udl.intensity)} kN/m", ha="center", va="center",
                      color="darkorange", fontweight="bold", fontsize=9,
-                     bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="orange", alpha=0.85))
+                     bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="orange", alpha=0.85), zorder=5)
 
-    # --- Draw UVLs (Triangles/Trapezoids) ---
+    # --- Draw UVLs (Tier 2: Stacked outside UDLs) ---
     for uvl in beam.uvls():
         is_downward = (uvl.w1 + uvl.w2) <= 0
         direction = 1 if is_downward else -1
-        base_y = 0.08 if is_downward else -0.08
+
+        # Tier 2 starts at 0.55 (just above the UDL maximum height of 0.48)
+        base_y = 0.55 if is_downward else -0.55
 
         max_w = max(abs(uvl.w1), abs(uvl.w2))
         if max_w == 0: continue
@@ -57,7 +60,9 @@ def plot_beam_results(beam: Beam, x_grid: np.ndarray, V_grid: np.ndarray, M_grid
             (uvl.end_x, base_y + h2 * direction),
             (uvl.start_x, base_y + h1 * direction)
         ]
-        poly = patches.Polygon(pts, color="orange", alpha=0.25, zorder=1)
+
+        # Using coral/orangered to distinguish from the standard UDL orange
+        poly = patches.Polygon(pts, color="coral", alpha=0.3, zorder=1)
         ax_beam.add_patch(poly)
 
         arrow_x_coords = np.linspace(uvl.start_x, uvl.end_x, num=max(3, int(uvl.span * 2.5)))
@@ -65,13 +70,19 @@ def plot_beam_results(beam: Beam, x_grid: np.ndarray, V_grid: np.ndarray, M_grid
             frac = (ax_pos - uvl.start_x) / uvl.span
             h_x = h1 + frac * (h2 - h1)
             if h_x > 0.02:
-                ax_beam.annotate("", xy=(ax_pos, base_y), xytext=(ax_pos, base_y + h_x * direction),
-                                 arrowprops=dict(arrowstyle="->", color="darkorange", lw=1.2), zorder=2)
+                # Arrows point towards base_y
+                if is_downward:
+                    ax_beam.annotate("", xy=(ax_pos, base_y), xytext=(ax_pos, base_y + h_x),
+                                     arrowprops=dict(arrowstyle="->", color="orangered", lw=1.2), zorder=2)
+                else:
+                    ax_beam.annotate("", xy=(ax_pos, base_y), xytext=(ax_pos, base_y - h_x),
+                                     arrowprops=dict(arrowstyle="->", color="orangered", lw=1.2), zorder=2)
 
-        label_y = 0.65 if is_downward else -0.65
+        # Label placed just above Tier 2
+        label_y = 1.15 if is_downward else -1.15
         ax_beam.text(uvl.centroid_x, label_y, f"w1={abs(uvl.w1)}, w2={abs(uvl.w2)}", ha="center", va="center",
-                     color="darkorange", fontweight="bold", fontsize=9,
-                     bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="orange", alpha=0.85))
+                     color="orangered", fontweight="bold", fontsize=9,
+                     bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="coral", alpha=0.85), zorder=5)
 
     # --- Draw Point Loads, Supports, Reactions & Moments ---
     for point in beam.points:

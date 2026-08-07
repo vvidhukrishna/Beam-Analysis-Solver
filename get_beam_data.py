@@ -66,12 +66,11 @@ def get_beam_data(interactive: bool = True) -> Beam:
         x_support_B = prompt_until_valid(f"Enter Support B location [default = {points[-1]}]: ", validate_b_wrapper)
 
     else:
-        # DEFAULT TEST CASE includes Point Load, UDL, and UVL (Triangle)
         points = [0.0, 2.5, 5.0, 8.0]
         point_loads = [0.0, -15.0, 0.0, 0.0]
         moments = [0.0, 0.0, 0.0, 0.0]
         udls = [(0.0, 2.5, -10.0)]
-        uvls = [(5.0, 8.0, 0.0, -20.0)]  # Triangle load growing to -20kN/m
+        uvls = [(5.0, 8.0, 0.0, -20.0)]
         x_support_A, x_support_B = 0.0, 8.0
 
     beam = Beam(length=max(points))
