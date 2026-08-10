@@ -99,3 +99,83 @@ def validate_uvl_spec(raw_str: str, beam_length: float) -> tuple[float, float, f
         raise ValueError(f"Invalid UVL bounds. Must satisfy 0 <= start_x < end_x <= {beam_length}m.")
 
     return start_x, end_x, w1, w2
+
+def analyze_input_state(text, expected_type="float"):
+    """
+    Analyzes a string and returns its typing state:
+    'empty', 'incomplete', 'valid', or 'invalid'
+    """
+    text = text.strip()
+    if not text:
+        return "empty"
+
+    # Common incomplete typing states for numbers
+    if text in ["-", ".", "-."]:
+        return "incomplete"
+
+    if text.endswith("e") or text.endswith("e-"):
+        return "incomplete"  # user is typing scientific notation
+
+    try:
+        if expected_type == "float":
+            val = float(text)
+            if val <= 0:  # For beam length, we strictly want > 0
+                return "invalid"
+            return "valid"
+
+        elif expected_type == "float_list":
+            # e.g., "0, 2.5, 5.0, 6"
+            parts = [p.strip() for p in text.split(",")]
+            for part in parts:
+                if part in ["", "-", ".", "-."]:
+                    return "incomplete"  # Still typing after a comma
+                float(part)  # Test conversion
+            return "valid"
+
+        elif expected_type == "udl_list":
+            # e.g., "0, 2, -10; 2, 4, -15"
+            return _check_complex_list(text, required_parts=3)
+
+        elif expected_type == "uvl_list":
+            # e.g., "0, 2, 0, -10"
+            return _check_complex_list(text, required_parts=4)
+
+    except ValueError:
+        return "invalid"
+
+
+def _check_complex_list(text, required_parts):
+    # Split by semicolons for multiple loads
+    groups = text.split(";")
+    for group in groups:
+        group = group.strip()
+        if not group:
+            continue  # trailing semicolon is okay, or user is about to type next
+
+        parts = [p.strip() for p in group.split(",")]
+
+        # If they haven't typed enough commas yet, it's incomplete
+        if len(parts) < required_parts:
+            # Check if what they HAVE typed so far is valid numbers/incomplete
+            for part in parts:
+                if part and part not in ["-", ".", "-."]:
+                    try:
+                        float(part)
+                    except ValueError:
+                        return "invalid"
+            return "incomplete"
+
+        # If they typed too many commas
+        if len(parts) > required_parts:
+            return "invalid"
+
+        # Check all parts in the group
+        for part in parts:
+            if part in ["", "-", ".", "-."]:
+                return "incomplete"
+            try:
+                float(part)
+            except ValueError:
+                return "invalid"
+
+    return "valid"
