@@ -1,241 +1,182 @@
-# gui.py
 import sys
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QLabel, QLineEdit,
-    QPushButton, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame
+import numpy as np
+
+try:
+    from PyQt6.QtWidgets import (
+        QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+        QLabel, QLineEdit, QPushButton, QTextEdit, QScrollArea, QGroupBox,
+        QFormLayout, QMessageBox
+    )
+    from PyQt6.QtCore import Qt
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+except ImportError:
+    from PyQt5.QtWidgets import (
+        QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+        QLabel, QLineEdit, QPushButton, QTextEdit, QScrollArea, QGroupBox,
+        QFormLayout, QMessageBox
+    )
+    from PyQt5.QtCore import Qt
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+from matplotlib.figure import Figure
+from get_beam_data import build_beam_from_gui_data
+from solvers import solve_reactions, calculate_sfd_bmd
+from plotting import plot_beam_results
+from Validation import (
+    validate_points, validate_float_list, validate_udl_spec,
+    validate_uvl_spec, validate_support_location, validate_support_separation
 )
-from PyQt5.QtCore import Qt
-from Validation import analyze_input_state
 
 
-class MainWindow(QMainWindow):
+class MplCanvas(FigureCanvas):
+    def __init__(self, parent=None, width=8, height=7, dpi=100):
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        super().__init__(self.fig)
+        self.setParent(parent)
+
+
+class BeamAnalysisApp(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("Beam Analysis & SFD/BMD Tool")
+        self.resize(1280, 800)
 
-        self.setWindowTitle("Beam Analysis Tool")
-        self.resize(600, 500)
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        main_layout = QHBoxLayout(main_widget)
 
-        # Base Application styling (Light grey background)
-        self.setStyleSheet("QMainWindow { background-color: #f4f5f7; }")
+        # ------------------- LEFT PANEL (INPUTS & RESULTS) -------------------
+        left_container = QWidget()
+        left_layout = QVBoxLayout(left_container)
 
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(40, 30, 40, 30)
-        main_layout.setSpacing(10)
+        # Scroll area for inputs
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
 
-        # --- HEADER ---
-        title_label = QLabel("BEAM ANALYSIS")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("font-size: 22px; font-weight: 800; color: #111827; letter-spacing: 1px;")
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
 
-        subtitle_label = QLabel("Shear Force & Bending Moment Diagram Generator")
-        subtitle_label.setAlignment(Qt.AlignCenter)
-        subtitle_label.setStyleSheet("font-size: 13px; color: #6b7280; margin-bottom: 20px;")
+        # Inputs Group
+        input_group = QGroupBox("Beam Parameters & Loading")
+        form_layout = QFormLayout(input_group)
 
-        main_layout.addWidget(title_label)
-        main_layout.addWidget(subtitle_label)
+        self.input_points = QLineEdit("0.0, 2.5, 5.0, 8.0")
+        self.input_loads = QLineEdit("0.0, -15.0, 0.0, 0.0")
+        self.input_moments = QLineEdit("0.0, 0.0, 0.0, 0.0")
+        self.input_udls = QLineEdit("0.0, 2.5, -10.0")
+        self.input_uvls = QLineEdit("5.0, 8.0, 0.0, -20.0")
+        self.input_sup_a = QLineEdit("0.0")
+        self.input_sup_b = QLineEdit("8.0")
 
-        # --- MAIN CONTENT CARD ---
-        card_frame = QFrame()
-        card_frame.setStyleSheet("""
-            QFrame {
-                background-color: #ffffff;
-                border-radius: 10px;
-                border: 1px solid #e5e7eb;
-            }
-        """)
-        card_layout = QVBoxLayout(card_frame)
-        card_layout.setContentsMargins(30, 30, 30, 30)
-        card_layout.setSpacing(20)
+        form_layout.addRow(QLabel("Points x (m):"), self.input_points)
+        form_layout.addRow(QLabel("Point Loads (kN):"), self.input_loads)
+        form_layout.addRow(QLabel("Applied Moments (kNm):"), self.input_moments)
+        form_layout.addRow(QLabel("UDLs (start, end, intensity; ...):"), self.input_udls)
+        form_layout.addRow(QLabel("UVLs (start, end, w1, w2; ...):"), self.input_uvls)
+        form_layout.addRow(QLabel("Support A x (m):"), self.input_sup_a)
+        form_layout.addRow(QLabel("Support B x (m):"), self.input_sup_b)
 
-        # Form layout for inputs
-        form_layout = QFormLayout()
-        form_layout.setSpacing(16)
-        form_layout.setLabelAlignment(Qt.AlignLeft)
-        # Style for the form labels
-        self.setStyleSheet(self.styleSheet() + """
-            QLabel { font-size: 13px; font-weight: 600; color: #374151; border: none; background: transparent; }
-        """)
+        scroll_layout.addWidget(input_group)
 
-        # -- SECTION: BEAM CONFIGURATION --
-        config_header = QLabel("BEAM CONFIGURATION")
-        config_header.setStyleSheet(
-            "font-size: 11px; font-weight: bold; color: #9ca3af; letter-spacing: 1px; margin-top: 5px;")
-        form_layout.addRow(config_header)
+        # Solve Button
+        self.btn_calculate = QPushButton("Calculate & Plot")
+        self.btn_calculate.setStyleSheet("font-weight: bold; padding: 8px;")
+        self.btn_calculate.clicked.connect(self.run_analysis)
+        scroll_layout.addWidget(self.btn_calculate)
 
-        # Beam Length
-        self.input_beam_length = QLineEdit()
-        self.input_beam_length.setPlaceholderText("e.g. 6.0")
+        # Results Display Box
+        results_group = QGroupBox("Analysis Results")
+        results_layout = QVBoxLayout(results_group)
+        self.results_box = QTextEdit()
+        self.results_box.setReadOnly(True)
+        results_layout.addWidget(self.results_box)
 
-        beam_length_layout = QHBoxLayout()
-        beam_length_layout.addWidget(self.input_beam_length)
-        unit_label = QLabel("m")
-        unit_label.setStyleSheet("color: #6b7280; font-weight: normal; background: transparent; border: none;")
-        beam_length_layout.addWidget(unit_label)
-        beam_length_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.addWidget(results_group)
+        scroll_area.setWidget(scroll_content)
 
-        beam_length_container = QWidget()
-        beam_length_container.setStyleSheet("background: transparent; border: none;")
-        beam_length_container.setLayout(beam_length_layout)
-        form_layout.addRow("Beam Length", beam_length_container)
+        left_layout.addWidget(scroll_area)
+        left_container.setMaximumWidth(420)
+        main_layout.addWidget(left_container)
 
-        # Point Locations
-        self.input_points = QLineEdit()
-        self.input_points.setPlaceholderText("e.g. 0.0, 3.0, 6.0")
-        form_layout.addRow("Point Locations", self.input_points)
+        # ------------------- RIGHT PANEL (CANVAS) -------------------
+        self.canvas_frame = QWidget()
+        canvas_layout = QVBoxLayout(self.canvas_frame)
+        self.canvas = MplCanvas(self.canvas_frame)
+        canvas_layout.addWidget(self.canvas)
 
-        # -- SECTION: LOADING CONDITIONS --
-        loads_header = QLabel("LOADING CONDITIONS")
-        loads_header.setStyleSheet(
-            "font-size: 11px; font-weight: bold; color: #9ca3af; letter-spacing: 1px; margin-top: 15px;")
-        form_layout.addRow(loads_header)
+        main_layout.addWidget(self.canvas_frame, stretch=1)
 
-        # Point Loads
-        self.input_point_loads = QLineEdit()
-        self.input_point_loads.setPlaceholderText("e.g. 0.0, -20.0, 0.0")
-        form_layout.addRow("Point Loads", self.input_point_loads)
+        # Run initial calculation on load
+        self.run_analysis()
 
-        # Applied Moments
-        self.input_applied_moments = QLineEdit()
-        self.input_applied_moments.setPlaceholderText("e.g. 0.0, 10.0, 0.0")
-        form_layout.addRow("Applied Moments", self.input_applied_moments)
+    def parse_udl_text(self, text: str, beam_length: float) -> list[tuple[float, float, float]]:
+        text = text.strip()
+        if not text:
+            return []
+        udls = []
+        for spec in text.split(";"):
+            if spec.strip():
+                udls.append(validate_udl_spec(spec, beam_length))
+        return udls
 
-        # UDLs
-        self.input_udls = QLineEdit()
-        self.input_udls.setPlaceholderText("start, end, intensity (e.g. 1.0, 4.0, -10.0)")
-        form_layout.addRow("UDLs", self.input_udls)
+    def parse_uvl_text(self, text: str, beam_length: float) -> list[tuple[float, float, float, float]]:
+        text = text.strip()
+        if not text:
+            return []
+        uvls = []
+        for spec in text.split(";"):
+            if spec.strip():
+                uvls.append(validate_uvl_spec(spec, beam_length))
+        return uvls
 
-        # UVLs
-        self.input_uvls = QLineEdit()
-        self.input_uvls.setPlaceholderText("start, end, w1, w2 (e.g. 2, 5, 0, -15)")
-        form_layout.addRow("UVLs", self.input_uvls)
+    def run_analysis(self):
+        try:
+            points = validate_points(self.input_points.text())
+            num_pts = len(points)
+            beam_length = max(points)
 
-        card_layout.addLayout(form_layout)
-        main_layout.addWidget(card_frame)
+            point_loads = validate_float_list(self.input_loads.text(), num_pts, "Point loads")
+            moments = validate_float_list(self.input_moments.text(), num_pts, "Applied moments")
 
-        main_layout.addStretch()
+            udls = self.parse_udl_text(self.input_udls.text(), beam_length)
+            uvls = self.parse_uvl_text(self.input_uvls.text(), beam_length)
 
-        # --- BUTTON ---
-        btn_layout = QHBoxLayout()
-        self.analyze_button = QPushButton("ANALYZE")
-        self.analyze_button.setEnabled(False)  # Disabled by default
-        self.analyze_button.setStyleSheet("""
-            QPushButton {
-                background-color: #2b5797;
-                color: white;
-                font-weight: bold;
-                font-size: 14px;
-                padding: 14px 60px;
-                border: none;
-                border-radius: 7px;
-                letter-spacing: 1px;
-            }
-            QPushButton:hover { background-color: #1f477f; }
-            QPushButton:pressed { background-color: #183762; }
-            QPushButton:disabled {
-                background-color: #e5e7eb;
-                color: #9ca3af;
-            }
-        """)
+            x_A = validate_support_location(self.input_sup_a.text(), points[0], beam_length, "Support A")
+            x_B = validate_support_location(self.input_sup_b.text(), points[-1], beam_length, "Support B")
+            validate_support_separation(x_A, x_B)
 
-        btn_layout.addStretch()
-        btn_layout.addWidget(self.analyze_button)
-        btn_layout.addStretch()
+            # Build Beam
+            beam = build_beam_from_gui_data(points, point_loads, moments, udls, uvls, x_A, x_B)
 
-        main_layout.addLayout(btn_layout)
+            # Solve Reactions
+            x_A, R_A, x_B, R_B = solve_reactions(beam)
 
-        # Setup initial states and connections
-        self.setup_inputs()
+            # Calculate SFD and BMD
+            x_grid, V_grid, M_grid = calculate_sfd_bmd(beam)
 
-    def setup_inputs(self):
-        """Applies base styles and connects textChanged signals."""
-        self.inputs = [
-            (self.input_beam_length, "float"),
-            (self.input_points, "float_list"),
-            (self.input_point_loads, "float_list"),
-            (self.input_applied_moments, "float_list"),
-            (self.input_udls, "udl_list"),
-            (self.input_uvls, "uvl_list")
-        ]
+            # Summary Statistics
+            max_v_idx = np.argmax(np.abs(V_grid))
+            max_m_idx = np.argmax(np.abs(M_grid))
 
-        for widget, expected_type in self.inputs:
-            self.set_input_state(widget, "neutral")
-            # Connect using a lambda to pass the specific widget and its type
-            widget.textChanged.connect(lambda text, w=widget, t=expected_type: self.validate_field(w, t))
+            res_text = (
+                "=== SUPPORT REACTIONS ===\n"
+                f"Support A (x = {x_A:.2f} m): R_A = {R_A:.2f} kN\n"
+                f"Support B (x = {x_B:.2f} m): R_B = {R_B:.2f} kN\n\n"
+                "=== EXTREMA ===\n"
+                f"Max |Shear Force|    : {abs(V_grid[max_v_idx]):.2f} kN (at x = {x_grid[max_v_idx]:.2f} m)\n"
+                f"Max |Bending Moment| : {abs(M_grid[max_m_idx]):.2f} kNm (at x = {x_grid[max_m_idx]:.2f} m)\n"
+            )
+            self.results_box.setText(res_text)
 
-    def set_input_state(self, widget, state):
-        """Applies stylesheet based on the validation state."""
-        base_style = """
-            QLineEdit {
-                border-radius: 6px;
-                padding: 8px 10px;
-                font-size: 13px;
-                color: #111827;
-        """
+            # Plot onto embedded Qt Canvas
+            plot_beam_results(self.canvas.fig, beam, x_grid, V_grid, M_grid)
 
-        if state == "valid":
-            widget.setStyleSheet(base_style + """
-                border: 2px solid #3fa36c;
-                background-color: #f8fffa;
-            }""")
-        elif state == "invalid":
-            widget.setStyleSheet(base_style + """
-                border: 2px solid #d9534f;
-                background-color: #fff8f8;
-            }""")
-        else:  # neutral / empty / incomplete
-            widget.setStyleSheet(base_style + """
-                border: 1px solid #d0d5dd;
-                background-color: white;
-            }
-            QLineEdit:focus {
-                border: 2px solid #2b5797;
-                background-color: white;
-            }""")
-
-    def validate_field(self, widget, expected_type):
-        """Validates a single field and triggers a global form check."""
-        text = widget.text()
-        state = analyze_input_state(text, expected_type)
-
-        if state in ["empty", "incomplete"]:
-            self.set_input_state(widget, "neutral")
-        else:
-            self.set_input_state(widget, state)
-
-        self.check_overall_form_validity()
-
-    def check_overall_form_validity(self):
-        """Enables the Analyze button ONLY if required fields are valid and no fields are invalid."""
-        all_valid = True
-
-        for widget, expected_type in self.inputs:
-            state = analyze_input_state(widget.text(), expected_type)
-
-            # Beam length and points are strictly REQUIRED.
-            if widget in [self.input_beam_length, self.input_points]:
-                if state != "valid":
-                    all_valid = False
-            # Loads are OPTIONAL (can be empty), but if filled, they must not be invalid/incomplete
-            else:
-                if state in ["invalid", "incomplete"]:
-                    all_valid = False
-
-        self.analyze_button.setEnabled(all_valid)
-
-
-def main():
-    app = QApplication(sys.argv)
-    # Set global application font
-    font = app.font()
-    font.setFamily("Segoe UI")  # Works well for modern UI on Windows/Linux
-    app.setFont(font)
-
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())
+        except Exception as e:
+            QMessageBox.critical(self, "Input / Calculation Error", str(e))
 
 
 if __name__ == "__main__":
-    main()
+    app = QApplication(sys.argv)
+    window = BeamAnalysisApp()
+    window.show()
+    sys.exit(app.exec())

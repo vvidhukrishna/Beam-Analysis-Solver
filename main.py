@@ -1,27 +1,25 @@
-from get_beam_data import get_beam_data
-from solvers import solve_reactions, calculate_sfd_bmd
-from plotting import plot_beam_results
+import sys
+
+# Try importing PyQt6 first, fallback to PyQt5 if needed
+try:
+    from PyQt6.QtWidgets import QApplication
+except ImportError:
+    from PyQt5.QtWidgets import QApplication
+
+from gui import BeamAnalysisApp
 
 
 def main():
-    try:
-        # 1. Get input data interactively
-        beam = get_beam_data(interactive=False)
+    # Initialize the Qt Application
+    app = QApplication(sys.argv)
 
-        # 2. Solve support reactions
-        x_A, R_A, x_B, R_B = solve_reactions(beam)
-        print(f"  • Reaction R_A at x = {x_A:.2f} m : {R_A:.2f} kN")
-        print(f"  • Reaction R_B at x = {x_B:.2f} m : {R_B:.2f} kN\n")
+    # Create and display the main window
+    window = BeamAnalysisApp()
+    window.show()
 
-        # 3. Calculate SFD and BMD arrays
-        x_grid, V_grid, M_grid = calculate_sfd_bmd(beam)
+    # Start the event loop
+    sys.exit(app.exec())
 
-        # 4. Render plots
-        print("Rendering Shear Force and Bending Moment Diagrams...")
-        plot_beam_results(beam, x_grid, V_grid, M_grid)
-
-    except Exception as e:
-        print(f"\n[Fatal Error] Could not complete analysis: {e}")
 
 if __name__ == "__main__":
     main()

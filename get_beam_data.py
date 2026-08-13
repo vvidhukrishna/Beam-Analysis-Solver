@@ -18,6 +18,35 @@ def prompt_until_valid(prompt_text: str, validator_fn: Callable[[str], T]) -> T:
             print(f"  [Input Error] {e} Please try again.\n")
 
 
+def build_beam_from_gui_data(
+    points: list[float],
+    point_loads: list[float],
+    moments: list[float],
+    udls: list[tuple[float, float, float]],
+    uvls: list[tuple[float, float, float, float]],
+    x_support_A: float,
+    x_support_B: float,
+) -> Beam:
+    beam = Beam(length=max(points))
+
+    for x, load, moment in zip(points, point_loads, moments):
+        if load != 0:
+            beam.add_event(x, PointLoad(force=load))
+        if moment != 0:
+            beam.add_event(x, AppliedMoment(moment=moment))
+
+    for start_x, end_x, intensity in udls:
+        beam.add_distributed_event(UniformDistributedLoad(start_x, end_x, intensity))
+
+    for start_x, end_x, w1, w2 in uvls:
+        beam.add_distributed_event(UniformVaryingLoad(start_x, end_x, w1, w2))
+
+    beam.add_event(x_support_A, Support(support_type=PINNED))
+    beam.add_event(x_support_B, Support(support_type=ROLLER))
+
+    return beam
+
+
 def get_beam_data(interactive: bool = True) -> Beam:
     print("--- Beam Data Input ---")
 
@@ -73,19 +102,4 @@ def get_beam_data(interactive: bool = True) -> Beam:
         uvls = [(5.0, 8.0, 0.0, -20.0)]
         x_support_A, x_support_B = 0.0, 8.0
 
-    beam = Beam(length=max(points))
-
-    for x, load, moment in zip(points, point_loads, moments):
-        if load != 0: beam.add_event(x, PointLoad(force=load))
-        if moment != 0: beam.add_event(x, AppliedMoment(moment=moment))
-
-    for start_x, end_x, intensity in udls:
-        beam.add_distributed_event(UniformDistributedLoad(start_x, end_x, intensity))
-
-    for start_x, end_x, w1, w2 in uvls:
-        beam.add_distributed_event(UniformVaryingLoad(start_x, end_x, w1, w2))
-
-    beam.add_event(x_support_A, Support(support_type=PINNED))
-    beam.add_event(x_support_B, Support(support_type=ROLLER))
-
-    return beam
+    return build_beam_from_gui_data(points, point_loads, moments, udls, uvls, x_support_A, x_support_B)
