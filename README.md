@@ -83,4 +83,3 @@ Distributed loads, graphical user interface, and report generation are planned f
 ## Why I Built This
 
 Rather than solving beam problems manually every time, I wanted to build the solver from first principles. The goal was not only to automate structural calculations but also to practice software engineering concepts such as modular design, object-oriented programming, validation, plotting, and version control.
-
