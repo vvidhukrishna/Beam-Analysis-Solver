@@ -1,83 +1,106 @@
-from beam import Beam, PointLoad, Reaction, AppliedMoment, Support, TOLERANCE
-from Validation import validate_equilibrium
+import numpy as np
+from beam import Beam, Reaction, TOLERANCE
 
 
-def solve_reactions(beam: Beam) -> None:
-    """Computes support reactions using static equilibrium equations."""
-    supports = beam.support_points()
+def solve_reactions(beam: Beam) -> tuple[float, float, float, float]:
+    beam.clear_reactions()
+
+    supports = list(beam.supports())
     if len(supports) != 2:
-        raise ValueError(f"Expected exactly 2 supports, found {len(supports)}")
+        raise ValueError(f"Solver requires exactly 2 supports, found {len(supports)}.")
 
-    supports.sort(key=lambda p: p.x)
-    pt_A, pt_B = supports[0], supports[1]
-    x_A, x_B = pt_A.x, pt_B.x
+    (x_A, _), (x_B, _) = supports[0], supports[1]
     span = x_B - x_A
 
-    if span <= TOLERANCE:
-        raise ValueError(f"Support span too small or overlapping supports (span = {span:.2e} m).")
+    if abs(span) < TOLERANCE:
+        raise ValueError("Support separation distance cannot be zero.")
 
-    # Sum moments about support A: ΣM_A = 0
-    M_applied_about_A = sum((x - x_A) * load.force for x, load in beam.point_loads())
-    M_applied_about_A += sum(moment.moment for _, moment in beam.applied_moments())
+    # Fetch ALL generic loads dynamically via equivalent forces
+    equiv_loads = list(beam.equivalent_loads())
+    F_applied_total = sum(force for _, force in equiv_loads)
 
-    # Calculate reaction forces
-    R_B = -M_applied_about_A / span
-    total_force = sum(load.force for _, load in beam.point_loads())
-    R_A = -total_force - R_B
+    # \sum M_A = 0
+    M_applied = sum(m.moment for _, m in beam.applied_moments())
+    M_loads = sum(force * (x - x_A) for x, force in equiv_loads)
+    M_total_about_A = M_applied + M_loads
 
-    # Validate equilibrium math
-    validate_equilibrium(beam, R_A, R_B, x_A, x_B)
+    R_B = -M_total_about_A / span
+    R_A = -(F_applied_total + R_B)
 
-    # Attach reactions to beam
     beam.add_event(x_A, Reaction(force=R_A))
     beam.add_event(x_B, Reaction(force=R_B))
 
-
-def calculate_sfd(beam: Beam) -> list[tuple[float, float]]:
-    """Calculates Shear Force Diagram (SFD) coordinates."""
-    sfd_data: list[tuple[float, float]] = []
-    current_shear = 0.0
-
-    for pt in beam.points:
-        sfd_data.append((pt.x, current_shear))
-
-        for event in pt.events:
-            if isinstance(event, (PointLoad, Reaction)):
-                current_shear += event.force
-
-        sfd_data.append((pt.x, current_shear))
-
-    return sfd_data
+    return x_A, R_A, x_B, R_B
 
 
-def calculate_bmd(beam: Beam) -> list[tuple[float, float]]:
-    """Calculates Bending Moment Diagram (BMD) coordinates."""
-    if not beam.points:
-        return []
+def calculate_sfd_bmd(beam: Beam, num_samples: int = 1000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    critical_x = {p.x for p in beam.points}
+    for dev in beam.distributed_events:
+        critical_x.add(dev.start_x)
+        critical_x.add(dev.end_x)
 
-    bmd_data: list[tuple[float, float]] = []
-    current_moment = 0.0
-    current_shear = 0.0
-    current_x = beam.points[0].x
+    extra_pts = []
+    for cx in critical_x:
+        if cx > 0: extra_pts.append(cx - 1e-7)
+        if cx < beam.length: extra_pts.append(cx + 1e-7)
 
-    for pt in beam.points:
-        dx = pt.x - current_x
-        current_moment += current_shear * dx
-        bmd_data.append((pt.x, current_moment))
+    base_grid = np.linspace(0, beam.length, num_samples)
+    x_all = np.unique(np.sort(np.concatenate([base_grid, list(critical_x), extra_pts])))
 
-        has_applied_moment = False
-        for event in pt.events:
-            if isinstance(event, AppliedMoment):
-                current_moment -= event.moment
-                has_applied_moment = True
+    shear_force = np.zeros_like(x_all)
+    bending_moment = np.zeros_like(x_all)
 
-        if has_applied_moment:
-            bmd_data.append((pt.x, current_moment))
+    # Collect discrete point forces for SFD
+    point_forces = []
+    for x, load in beam.point_loads(): point_forces.append((x, load.force))
+    for p in beam.points:
+        for ev in p.events:
+            if isinstance(ev, Reaction): point_forces.append((p.x, ev.force))
 
-        for event in pt.events:
-            if isinstance(event, (PointLoad, Reaction)):
-                current_shear += event.force
+    applied_moments = [(x, m.moment) for x, m in beam.applied_moments()]
+    udls = list(beam.udls())
+    uvls = list(beam.uvls())
 
-        current_x = pt.x
+    for idx, x in enumerate(x_all):
+        # 1. Point events
+        V_pt = sum(f for px, f in point_forces if px <= x)
+        M_pt = sum(f * (x - px) for px, f in point_forces if px <= x) + sum(m for px, m in applied_moments if px <= x)
 
-    return bmd_data
+        V_udl = M_udl = 0.0
+        for udl in udls:
+            if x >= udl.end_x:
+                V_udl += udl.resultant_force
+                M_udl += udl.resultant_force * (x - udl.centroid_x)
+            elif x > udl.start_x:
+                active_len = x - udl.start_x
+                active_force = udl.intensity * active_len
+                V_udl += active_force
+                M_udl += active_force * (x - (udl.start_x + active_len / 2.0))
+
+        # 2. UVL Integration (using trapezoid area formulas dynamically)
+        V_uvl = M_uvl = 0.0
+        for uvl in uvls:
+            if x >= uvl.end_x:
+                V_uvl += uvl.resultant_force
+                M_uvl += uvl.resultant_force * (x - uvl.centroid_x)
+            elif x > uvl.start_x:
+                a = x - uvl.start_x
+                # Find current intensity w(x) via linear interpolation
+                w_x = uvl.w1 + (uvl.w2 - uvl.w1) * (a / uvl.span)
+
+                # Active trapezoid area
+                active_force = ((uvl.w1 + w_x) / 2.0) * a
+                V_uvl += active_force
+
+                # Active trapezoid centroid distance from start_x
+                if abs(uvl.w1 + w_x) < TOLERANCE:
+                    active_centroid = uvl.start_x + (a / 2.0)
+                else:
+                    active_centroid = uvl.start_x + (a / 3.0) * ((uvl.w1 + 2 * w_x) / (uvl.w1 + w_x))
+
+                M_uvl += active_force * (x - active_centroid)
+
+        shear_force[idx] = V_pt + V_udl + V_uvl
+        bending_moment[idx] = M_pt + M_udl + M_uvl
+
+    return x_all, shear_force, bending_moment
