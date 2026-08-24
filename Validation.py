@@ -1,31 +1,29 @@
-from beam import Beam, TOLERANCE
-
-
 def validate_support_count(count_str: str) -> int:
-    """Validates support count input."""
+    """Validates support count input to allow cantilevers (1) or simply supported (2)."""
     count = int(count_str)
-    if count != 2:
-        raise ValueError(f"Version 2 only supports exactly 2 supports (got {count}).")
+    if count not in (1, 2):
+        raise ValueError(f"Supports must be 1 (Cantilever) or 2 (Simply Supported). Got {count}.")
     return count
 
 
-def validate_points(points_str: str) -> list[float]:
-    """Parses and validates point locations."""
+def validate_support_order(x_A: float, x_B: float) -> None:
+    """Checks that Support A is strictly to the left of Support B."""
+    if x_A >= x_B:
+        raise ValueError(f"Support A (x={x_A}m) must be placed strictly before Support B (x={x_B}m).")
+
+
+def validate_points(points_str: str, beam_length: float) -> list[float]:
+    """Parses and validates point locations against the beam boundaries."""
     if not points_str.strip():
-        raise ValueError("Points list cannot be empty.")
+        return []
 
     pts = [float(val.strip()) for val in points_str.split(",")]
-    beam_length = max(pts)
-
-    if beam_length <= 0:
-        raise ValueError(f"Beam length must be greater than 0 (got {beam_length}m).")
 
     for x in pts:
-        if x < 0:
-            raise ValueError(f"Point location x = {x}m cannot be negative.")
+        if x < 0 or x > beam_length:
+            raise ValueError(f"Point location x = {x}m must be between 0 and {beam_length}m.")
 
     return pts
-
 
 def validate_float_list(raw_input: str, expected_length: int, label: str) -> list[float]:
     """Parses float list and ensures length matches points array."""
@@ -75,17 +73,12 @@ def validate_support_location(
         raise ValueError(f"{support_name} (x = {val}m) must be between 0 and beam length ({beam_length}m).")
     return val
 
-
-def validate_support_separation(x_A: float, x_B: float) -> None:
-    """Checks that supports A and B are distinct."""
-    if abs(x_A - x_B) < TOLERANCE:
-        raise ValueError(f"Support B cannot be at the exact same location as Support A (x = {x_A}m).")
-
 def validate_uvl_count(raw_str: str) -> int:
     count = int(raw_str.strip() or "0")
     if count < 0:
         raise ValueError("UVL count cannot be negative.")
     return count
+
 
 def validate_uvl_spec(raw_str: str, beam_length: float) -> tuple[float, float, float, float]:
     """Parses UVL string: 'start_x, end_x, w1, w2'."""
@@ -100,6 +93,7 @@ def validate_uvl_spec(raw_str: str, beam_length: float) -> tuple[float, float, f
 
     return start_x, end_x, w1, w2
 
+
 def analyze_input_state(text, expected_type="float"):
     """
     Analyzes a string and returns its typing state:
@@ -109,35 +103,31 @@ def analyze_input_state(text, expected_type="float"):
     if not text:
         return "empty"
 
-    # Common incomplete typing states for numbers
     if text in ["-", ".", "-."]:
         return "incomplete"
 
     if text.endswith("e") or text.endswith("e-"):
-        return "incomplete"  # user is typing scientific notation
+        return "incomplete"
 
     try:
         if expected_type == "float":
             val = float(text)
-            if val <= 0:  # For beam length, we strictly want > 0
+            if val <= 0:
                 return "invalid"
             return "valid"
 
         elif expected_type == "float_list":
-            # e.g., "0, 2.5, 5.0, 6"
             parts = [p.strip() for p in text.split(",")]
             for part in parts:
                 if part in ["", "-", ".", "-."]:
-                    return "incomplete"  # Still typing after a comma
-                float(part)  # Test conversion
+                    return "incomplete"
+                float(part)
             return "valid"
 
         elif expected_type == "udl_list":
-            # e.g., "0, 2, -10; 2, 4, -15"
             return _check_complex_list(text, required_parts=3)
 
         elif expected_type == "uvl_list":
-            # e.g., "0, 2, 0, -10"
             return _check_complex_list(text, required_parts=4)
 
     except ValueError:
@@ -145,18 +135,15 @@ def analyze_input_state(text, expected_type="float"):
 
 
 def _check_complex_list(text, required_parts):
-    # Split by semicolons for multiple loads
     groups = text.split(";")
     for group in groups:
         group = group.strip()
         if not group:
-            continue  # trailing semicolon is okay, or user is about to type next
+            continue
 
         parts = [p.strip() for p in group.split(",")]
 
-        # If they haven't typed enough commas yet, it's incomplete
         if len(parts) < required_parts:
-            # Check if what they HAVE typed so far is valid numbers/incomplete
             for part in parts:
                 if part and part not in ["-", ".", "-."]:
                     try:
@@ -165,11 +152,9 @@ def _check_complex_list(text, required_parts):
                         return "invalid"
             return "incomplete"
 
-        # If they typed too many commas
         if len(parts) > required_parts:
             return "invalid"
 
-        # Check all parts in the group
         for part in parts:
             if part in ["", "-", ".", "-."]:
                 return "incomplete"

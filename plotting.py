@@ -1,143 +1,121 @@
-import matplotlib.patches as patches
 import numpy as np
-from beam import Beam, Reaction, Support, PointLoad, AppliedMoment, PINNED
+import matplotlib.patches as patches
+from beam import Beam, Support, ReactionMoment, UniformDistributedLoad, UniformVaryingLoad, PointLoad, AppliedMoment, FIXED, PINNED, \
+    ROLLER
 
 
-def plot_beam_results(fig, beam: Beam, x_grid: np.ndarray, V_grid: np.ndarray, M_grid: np.ndarray) -> None:
+def plot_beam_results(beam: Beam, x_vals: np.ndarray, V_vals: np.ndarray, M_vals: np.ndarray, fig,
+                      reactions_dict: dict):
+    """
+    Renders the Beam Diagram, Shear Force Diagram (SFD), and Bending Moment Diagram (BMD).
+    Renders onto the provided Matplotlib Figure (fig).
+    """
     fig.clear()
-    ax_beam, ax_sfd, ax_bmd = fig.subplots(3, 1, sharex=True)
 
-    # ==========================================
-    # 1. TOP PANEL: BEAM SCHEMATIC & LOADS
-    # ==========================================
-    ax_beam.set_title("Beam Loading Schematic")
-    ax_beam.plot([0, beam.length], [0, 0], color="black", linewidth=5, zorder=3)
-    ax_beam.set_ylim(-2.8, 2.8)
-    ax_beam.set_yticks([])
-    ax_beam.grid(True, linestyle="--", alpha=0.4)
+    ax1 = fig.add_subplot(311)
+    ax2 = fig.add_subplot(312)
+    ax3 = fig.add_subplot(313)
 
-    # --- Draw UDLs ---
+    L = beam.length
+
+    # ---------------------------------------------------------
+    # 1. BEAM DIAGRAM
+    # ---------------------------------------------------------
+    ax1.plot([0, L], [0, 0], color='black', linewidth=4)
+    ax1.set_xlim(-0.1 * L, L * 1.1)
+    ax1.set_ylim(-2, 2)
+    ax1.axis('off')
+
+    # Build Header Text based on beam type
+    if reactions_dict["type"] == "cantilever":
+        rxn_text = (f"Cantilever Fixed Support at x = {reactions_dict['x_A']} m\n"
+                    f"Reaction R = {reactions_dict['R_A']:.2f} kN, M = {reactions_dict['M_A']:.2f} kNm")
+    else:
+        rxn_text = (f"Simply Supported\n"
+                    f"R_A (x={reactions_dict['x_A']}m) = {reactions_dict['R_A']:.2f} kN, "
+                    f"R_B (x={reactions_dict['x_B']}m) = {reactions_dict['R_B']:.2f} kN")
+    ax1.set_title(f"Beam Diagram\n{rxn_text}")
+
+    # Draw Supports
+    for p in beam.points:
+        for ev in p.events:
+            if isinstance(ev, Support):
+                if ev.support_type == FIXED:
+                    # Draw a gray wall. If it's on the left, wall goes left. If right, wall goes right.
+                    width = 0.03 * L if L > 0 else 0.1
+                    x_start = p.x - width if p.x < L / 2 else p.x
+                    rect = patches.Rectangle((x_start, -1), width, 2, facecolor='gray', hatch='//', edgecolor='black')
+                    ax1.add_patch(rect)
+                elif ev.support_type == PINNED:
+                    # Draw a blue triangle
+                    triangle = patches.Polygon([[p.x, 0], [p.x - 0.05 * L, -0.5], [p.x + 0.05 * L, -0.5]], color='blue')
+                    ax1.add_patch(triangle)
+                elif ev.support_type == ROLLER:
+                    # Draw a green circle
+                    circle = patches.Circle((p.x, -0.25), 0.25, color='green')
+                    ax1.add_patch(circle)
+
+    # Draw Point Loads
+    for x, load in beam.point_loads():
+        sign = 1 if load.force > 0 else -1
+        y_start = 1 * sign
+        ax1.annotate("", xy=(x, 0), xytext=(x, y_start),
+                     arrowprops=dict(facecolor='red', shrink=0.05, width=2, headwidth=8))
+        ax1.text(x, y_start * 1.2, f"{abs(load.force):.1f} kN", color='red', ha='center', va='center')
+
+    # Draw Applied Moments
+    for x, moment in beam.applied_moments():
+        arc = patches.Arc((x, 0), L * 0.1, 1, angle=0, theta1=0, theta2=180, color='purple', linewidth=2)
+        ax1.add_patch(arc)
+        ax1.text(x, 0.6, f"{moment.moment:.1f} kNm", color='purple', ha='center', va='bottom')
+
+    # Draw Reaction Moments (The Fixed Support Moment)
+    for p in beam.points:
+        for ev in p.events:
+            if isinstance(ev, ReactionMoment):
+                # Draw a red dashed arc to distinguish it from applied moments
+                arc = patches.Arc((p.x, 0), L * 0.15, 1.5, angle=0, theta1=0, theta2=180,
+                                  color='red', linewidth=2, linestyle='--')
+                ax1.add_patch(arc)
+                ax1.text(p.x, 0.9, f"M_R = {ev.moment:.1f} kNm",
+                         color='red', ha='center', va='bottom')
+
+    # Draw Distributed Loads
     for udl in beam.udls():
-        is_downward = udl.intensity < 0
-        box_bottom = 0.08 if is_downward else -0.48
+        ax1.add_patch(patches.Rectangle((udl.start_x, 0), udl.span, 0.5, color='orange', alpha=0.3))
+        ax1.text(udl.centroid_x, 0.6, f"{udl.intensity:.1f} kN/m", color='darkorange', ha='center')
 
-        rect = patches.Rectangle((udl.start_x, box_bottom), udl.span, 0.40, color="orange", alpha=0.3, zorder=1)
-        ax_beam.add_patch(rect)
-
-        arrow_x_coords = np.linspace(udl.start_x, udl.end_x, num=max(3, int(udl.span * 2.5)))
-        for ax_pos in arrow_x_coords:
-            if is_downward:
-                ax_beam.annotate("", xy=(ax_pos, 0.08), xytext=(ax_pos, 0.48),
-                                 arrowprops=dict(arrowstyle="->", color="darkorange", lw=1.2), zorder=2)
-            else:
-                ax_beam.annotate("", xy=(ax_pos, -0.08), xytext=(ax_pos, -0.48),
-                                 arrowprops=dict(arrowstyle="->", color="darkorange", lw=1.2), zorder=2)
-
-        label_y = 0.65 if is_downward else -0.65
-        ax_beam.text(udl.centroid_x, label_y, f"w = {abs(udl.intensity)} kN/m", ha="center", va="center",
-                     color="darkorange", fontweight="bold", fontsize=9,
-                     bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="orange", alpha=0.85), zorder=5)
-
-    # --- Draw UVLs ---
     for uvl in beam.uvls():
-        is_downward = (uvl.w1 + uvl.w2) <= 0
-        direction = 1 if is_downward else -1
-        base_y = 0.55 if is_downward else -0.55
+        poly = patches.Polygon([
+            (uvl.start_x, 0),
+            (uvl.start_x, 0.5 * (uvl.w1 / max(abs(uvl.w1), abs(uvl.w2), 1e-5))),
+            (uvl.end_x, 0.5 * (uvl.w2 / max(abs(uvl.w1), abs(uvl.w2), 1e-5))),
+            (uvl.end_x, 0)
+        ], color='cyan', alpha=0.3)
+        ax1.add_patch(poly)
+        ax1.text(uvl.centroid_x, 0.6, f"UVL", color='teal', ha='center')
 
-        max_w = max(abs(uvl.w1), abs(uvl.w2))
-        if max_w == 0:
-            continue
+    # ---------------------------------------------------------
+    # 2. SHEAR FORCE DIAGRAM (SFD)
+    # ---------------------------------------------------------
+    ax2.plot(x_vals, V_vals, color='blue', linewidth=2)
+    ax2.fill_between(x_vals, V_vals, 0, color='blue', alpha=0.1)
+    ax2.axhline(0, color='black', linewidth=1)
+    ax2.set_xlim(0, L)
+    ax2.set_ylabel("Shear Force (kN)")
+    ax2.set_title("Shear Force Diagram")
+    ax2.grid(True, linestyle='--', alpha=0.6)
 
-        h1 = (abs(uvl.w1) / max_w) * 0.40
-        h2 = (abs(uvl.w2) / max_w) * 0.40
-
-        pts = [
-            (uvl.start_x, base_y),
-            (uvl.end_x, base_y),
-            (uvl.end_x, base_y + h2 * direction),
-            (uvl.start_x, base_y + h1 * direction)
-        ]
-
-        poly = patches.Polygon(pts, color="coral", alpha=0.3, zorder=1)
-        ax_beam.add_patch(poly)
-
-        arrow_x_coords = np.linspace(uvl.start_x, uvl.end_x, num=max(3, int(uvl.span * 2.5)))
-        for ax_pos in arrow_x_coords:
-            frac = (ax_pos - uvl.start_x) / uvl.span
-            h_x = h1 + frac * (h2 - h1)
-            if h_x > 0.02:
-                if is_downward:
-                    ax_beam.annotate("", xy=(ax_pos, base_y), xytext=(ax_pos, base_y + h_x),
-                                     arrowprops=dict(arrowstyle="->", color="orangered", lw=1.2), zorder=2)
-                else:
-                    ax_beam.annotate("", xy=(ax_pos, base_y), xytext=(ax_pos, base_y - h_x),
-                                     arrowprops=dict(arrowstyle="->", color="orangered", lw=1.2), zorder=2)
-
-        label_y = 1.15 if is_downward else -1.15
-        ax_beam.text(uvl.centroid_x, label_y, f"w1={abs(uvl.w1)}, w2={abs(uvl.w2)}", ha="center", va="center",
-                     color="orangered", fontweight="bold", fontsize=9,
-                     bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="coral", alpha=0.85), zorder=5)
-
-    # --- Draw Point Loads, Supports, Reactions & Moments ---
-    for point in beam.points:
-        x = point.x
-        p_loads = [ev for ev in point.events if isinstance(ev, PointLoad)]
-        app_moments = [ev for ev in point.events if isinstance(ev, AppliedMoment)]
-        reactions = [ev for ev in point.events if isinstance(ev, Reaction)]
-        supports = [ev for ev in point.events if isinstance(ev, Support)]
-
-        for sup in supports:
-            marker = "^" if sup.support_type == PINNED else "o"
-            ax_beam.plot(x, -0.08, marker=marker, markersize=12, color="black", zorder=4)
-
-        for load in p_loads:
-            if load.force < 0:
-                ax_beam.annotate(f"P = {abs(load.force)} kN", xy=(x, 0.12), xytext=(x, 1.45),
-                                 arrowprops=dict(arrowstyle="->", color="red", lw=2.2), ha="center", va="bottom",
-                                 color="red", fontweight="bold", fontsize=9.5,
-                                 bbox=dict(boxstyle="square,pad=0.2", facecolor="white", edgecolor="red", alpha=0.85))
-            else:
-                ax_beam.annotate(f"P = {abs(load.force)} kN", xy=(x, -0.12), xytext=(x, -1.45),
-                                 arrowprops=dict(arrowstyle="->", color="red", lw=2.2), ha="center", va="top",
-                                 color="red", fontweight="bold", fontsize=9.5,
-                                 bbox=dict(boxstyle="square,pad=0.2", facecolor="white", edgecolor="red", alpha=0.85))
-
-        for rxn in reactions:
-            if rxn.force >= 0:
-                ax_beam.annotate(f"R = {rxn.force:.1f} kN", xy=(x, -0.20), xytext=(x, -1.85),
-                                 arrowprops=dict(arrowstyle="->", color="blue", lw=2.2), ha="center", va="top",
-                                 color="blue", fontweight="bold", fontsize=9.5,
-                                 bbox=dict(boxstyle="square,pad=0.2", facecolor="white", edgecolor="blue", alpha=0.85))
-            else:
-                ax_beam.annotate(f"R = {rxn.force:.1f} kN", xy=(x, 0.20), xytext=(x, 1.85),
-                                 arrowprops=dict(arrowstyle="->", color="blue", lw=2.2), ha="center", va="bottom",
-                                 color="blue", fontweight="bold", fontsize=9.5,
-                                 bbox=dict(boxstyle="square,pad=0.2", facecolor="white", edgecolor="blue", alpha=0.85))
-
-        for mom in app_moments:
-            symbol = "↺" if mom.moment > 0 else "↻"
-            ax_beam.text(x, 2.25, f"M = {abs(mom.moment)} kNm {symbol}", ha="center", va="center", color="purple",
-                         fontweight="bold", fontsize=9.5,
-                         bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="purple", alpha=0.85))
-            ax_beam.plot([x, x], [0.1, 1.95], color="purple", linestyle=":", linewidth=1.2)
-
-    # ==========================================
-    # 2. SFD & BMD
-    # ==========================================
-    ax_sfd.set_title("Shear Force Diagram (SFD)")
-    ax_sfd.plot(x_grid, V_grid, color="crimson", linewidth=2)
-    ax_sfd.fill_between(x_grid, V_grid, 0, color="crimson", alpha=0.15)
-    ax_sfd.axhline(0, color="black", linewidth=0.8)
-    ax_sfd.set_ylabel("Shear Force (kN)")
-    ax_sfd.grid(True, linestyle="--", alpha=0.6)
-
-    ax_bmd.set_title("Bending Moment Diagram (BMD)")
-    ax_bmd.plot(x_grid, M_grid, color="navy", linewidth=2)
-    ax_bmd.fill_between(x_grid, M_grid, 0, color="navy", alpha=0.15)
-    ax_bmd.axhline(0, color="black", linewidth=0.8)
-    ax_bmd.set_xlabel("Beam Position x (m)")
-    ax_bmd.set_ylabel("Moment (kNm)")
-    ax_bmd.grid(True, linestyle="--", alpha=0.6)
+    # ---------------------------------------------------------
+    # 3. BENDING MOMENT DIAGRAM (BMD)
+    # ---------------------------------------------------------
+    ax3.plot(x_vals, M_vals, color='green', linewidth=2)
+    ax3.fill_between(x_vals, M_vals, 0, color='green', alpha=0.1)
+    ax3.axhline(0, color='black', linewidth=1)
+    ax3.set_xlim(0, L)
+    ax3.set_xlabel("Beam Length (m)")
+    ax3.set_ylabel("Bending Moment (kNm)")
+    ax3.set_title("Bending Moment Diagram")
+    ax3.grid(True, linestyle='--', alpha=0.6)
 
     fig.tight_layout()
-    fig.canvas.draw()

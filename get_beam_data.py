@@ -1,105 +1,95 @@
-from typing import Callable, TypeVar
-from beam import Beam, PointLoad, AppliedMoment, Support, UniformDistributedLoad, UniformVaryingLoad, PINNED, ROLLER
+from beam import Beam, Support, UniformDistributedLoad, UniformVaryingLoad, PointLoad, AppliedMoment, PINNED, ROLLER, \
+    FIXED
 from Validation import (
-    validate_support_count, validate_points, validate_float_list,
-    validate_udl_count, validate_udl_spec, validate_uvl_count, validate_uvl_spec,
-    validate_support_location, validate_support_separation,
+    validate_points, validate_float_list, validate_udl_count, validate_udl_spec,
+    validate_support_location, validate_support_order, validate_uvl_count,
+    validate_uvl_spec, validate_support_count
 )
 
-T = TypeVar("T")
 
+def get_beam_data(interactive=True) -> Beam:
+    """Collects beam parameters and returns a populated Beam object."""
+    print("\n--- Beam Configuration ---")
 
-def prompt_until_valid(prompt_text: str, validator_fn: Callable[[str], T]) -> T:
-    while True:
-        try:
-            raw_val = input(prompt_text)
-            return validator_fn(raw_val)
-        except (ValueError, TypeError) as e:
-            print(f"  [Input Error] {e} Please try again.\n")
+    # 1. Length
+    length = float(input("Enter length of beam (m): "))
+    while length <= 0:
+        print("Length must be > 0.")
+        length = float(input("Enter length of beam (m): "))
 
+    beam = Beam(length)
 
-def build_beam_from_gui_data(
-    points: list[float],
-    point_loads: list[float],
-    moments: list[float],
-    udls: list[tuple[float, float, float]],
-    uvls: list[tuple[float, float, float, float]],
-    x_support_A: float,
-    x_support_B: float,
-) -> Beam:
-    beam = Beam(length=max(points))
+    # 2. Supports
+    supp_count_str = input("Enter number of supports (1 for Cantilever, 2 for Simply Supported): ")
+    supp_count = validate_support_count(supp_count_str)
 
-    for x, load, moment in zip(points, point_loads, moments):
-        if load != 0:
-            beam.add_event(x, PointLoad(force=load))
-        if moment != 0:
-            beam.add_event(x, AppliedMoment(moment=moment))
+    if supp_count == 1:
+        print("Cantilever selected: Fixed support automatically placed at x = 0.0m")
+        beam.add_event(0.0, Support(FIXED))
+    else:
+        x_A_str = input(f"Enter location for Support A (m) [Default: 0]: ")
+        x_A = validate_support_location(x_A_str, 0.0, length, "Support A")
 
-    for start_x, end_x, intensity in udls:
-        beam.add_distributed_event(UniformDistributedLoad(start_x, end_x, intensity))
+        x_B_str = input(f"Enter location for Support B (m) [Default: {length}]: ")
+        x_B = validate_support_location(x_B_str, length, length, "Support B")
 
-    for start_x, end_x, w1, w2 in uvls:
-        beam.add_distributed_event(UniformVaryingLoad(start_x, end_x, w1, w2))
+        validate_support_order(x_A, x_B)  # <-- NEW VALIDATION
 
-    beam.add_event(x_support_A, Support(support_type=PINNED))
-    beam.add_event(x_support_B, Support(support_type=ROLLER))
+        beam.add_event(x_A, Support(PINNED))
+        beam.add_event(x_B, Support(ROLLER))
+
+    # 3. Point Loads
+    pt_loc_str = input("\nEnter Point Load locations separated by comma (press Enter to skip): ")
+    if pt_loc_str.strip():
+        pt_locs = validate_points(pt_loc_str, length)
+        mag_str = input(f"Enter {len(pt_locs)} Point Load magnitudes separated by comma: ")
+        pt_mags = validate_float_list(mag_str, len(pt_locs), "Point Load magnitudes")
+
+        for loc, mag in zip(pt_locs, pt_mags):
+            beam.add_event(loc, PointLoad(mag))
+
+    # 4. Applied Moments
+    mom_loc_str = input("\nEnter Applied Moment locations separated by comma (press Enter to skip): ")
+    if mom_loc_str.strip():
+        mom_locs = validate_points(mom_loc_str, length)
+        mag_str = input(f"Enter {len(mom_locs)} Moment magnitudes separated by comma: ")
+        mom_mags = validate_float_list(mag_str, len(mom_locs), "Moment magnitudes")
+
+        for loc, mag in zip(mom_locs, mom_mags):
+            beam.add_event(loc, AppliedMoment(mag))
+
+    # 5. UDLs
+    udl_count_str = input("\nEnter the number of Uniform Distributed Loads (UDLs) [Default: 0]: ")
+    udl_count = validate_udl_count(udl_count_str)
+    for i in range(udl_count):
+        spec_str = input(f"  UDL {i + 1} (format: start_x, end_x, intensity): ")
+        s, e, intensity = validate_udl_spec(spec_str, length)
+        beam.add_distributed_event(UniformDistributedLoad(s, e, intensity))
+
+    # 6. UVLs
+    uvl_count_str = input("\nEnter the number of Uniform Varying Loads (UVLs) [Default: 0]: ")
+    uvl_count = validate_uvl_count(uvl_count_str)
+    for i in range(uvl_count):
+        spec_str = input(f"  UVL {i + 1} (format: start_x, end_x, w1, w2): ")
+        s, e, w1, w2 = validate_uvl_spec(spec_str, length)
+        beam.add_distributed_event(UniformVaryingLoad(s, e, w1, w2))
 
     return beam
 
 
-def get_beam_data(interactive: bool = True) -> Beam:
-    print("--- Beam Data Input ---")
+if __name__ == "__main__":
+    # Test runner logic if executed directly in terminal
+    from solvers import solve_reactions
 
-    if interactive:
-        number_of_supports = prompt_until_valid("Enter number of supports (e.g., 2): ", validate_support_count)
-
-        print("\nEnter point locations as comma-separated values (e.g., 0.0, 3.0, 4.5, 6.0):")
-        points = prompt_until_valid("  Point locations x (m): ", validate_points)
-        num_pts, beam_length = len(points), max(points)
-
-        point_loads = prompt_until_valid(
-            f"  Point loads ({num_pts} values in kN): ",
-            lambda raw: validate_float_list(raw, num_pts, "Point loads"),
-        )
-        moments = prompt_until_valid(
-            f"  Applied moments ({num_pts} values in kNm): ",
-            lambda raw: validate_float_list(raw, num_pts, "Applied moments"),
-        )
-
-        udl_count = prompt_until_valid("\nEnter number of UDLs [default = 0]: ", validate_udl_count)
-        udls = []
-        for i in range(udl_count):
-            udls.append(prompt_until_valid(
-                f"  UDL #{i + 1} (start_x, end_x, intensity): ",
-                lambda raw: validate_udl_spec(raw, beam_length)
-            ))
-
-        uvl_count = prompt_until_valid("\nEnter number of UVLs [default = 0]: ", validate_uvl_count)
-        uvls = []
-        for i in range(uvl_count):
-            uvls.append(prompt_until_valid(
-                f"  UVL #{i + 1} (start_x, end_x, w1, w2): ",
-                lambda raw: validate_uvl_spec(raw, beam_length)
-            ))
-
-        x_support_A = prompt_until_valid(
-            f"\nEnter Support A location [default = {points[0]}]: ",
-            lambda raw: validate_support_location(raw, points[0], beam_length, "Support A"),
-        )
-
-        def validate_b_wrapper(raw_input: str) -> float:
-            xB = validate_support_location(raw_input, points[-1], beam_length, "Support B")
-            validate_support_separation(x_support_A, xB)
-            return xB
-
-        x_support_B = prompt_until_valid(f"Enter Support B location [default = {points[-1]}]: ", validate_b_wrapper)
-
-    else:
-        points = [0.0, 2.5, 5.0, 8.0]
-        point_loads = [0.0, -15.0, 0.0, 0.0]
-        moments = [0.0, 0.0, 0.0, 0.0]
-        udls = [(0.0, 2.5, -10.0)]
-        uvls = [(5.0, 8.0, 0.0, -20.0)]
-        x_support_A, x_support_B = 0.0, 8.0
-
-    return build_beam_from_gui_data(points, point_loads, moments, udls, uvls, x_support_A, x_support_B)
+    try:
+        b = get_beam_data()
+        reactions = solve_reactions(b)
+        print("\n--- Beam Reactions ---")
+        if reactions["type"] == "cantilever":
+            print(
+                f"Fixed Support (x={reactions['x_A']}): Reaction = {reactions['R_A']} kN, Moment = {reactions['M_A']} kNm")
+        else:
+            print(f"Support A (x={reactions['x_A']}): {reactions['R_A']} kN")
+            print(f"Support B (x={reactions['x_B']}): {reactions['R_B']} kN")
+    except Exception as e:
+        print(f"Error: {e}")

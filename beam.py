@@ -49,6 +49,11 @@ class Reaction(PointEvent):
         self.force = force
 
 
+class ReactionMoment(PointEvent):
+    def __init__(self, moment: float = 0.0):
+        self.moment = moment
+
+
 class Support(PointEvent):
     def __init__(self, support_type: str):
         self.support_type = support_type
@@ -130,7 +135,7 @@ class Beam:
 
     def clear_reactions(self) -> None:
         for p in self.points:
-            p.events = [ev for ev in p.events if not isinstance(ev, Reaction)]
+            p.events = [ev for ev in p.events if not isinstance(ev, (Reaction, ReactionMoment))]
 
     # --- Query Helpers ---
 
