@@ -51,7 +51,6 @@ def solve_reactions(beam: Beam) -> dict:
         if abs(span) < TOLERANCE:
             raise ValueError("Support separation distance cannot be zero.")
 
-        # \sum M_A = 0
         M_loads = sum(force * (x - x_A) for x, force in equiv_loads)
         M_total_about_A = M_applied + M_loads
 
@@ -94,7 +93,7 @@ def calculate_sfd_bmd(beam: Beam, num_samples: int = 1000) -> tuple[np.ndarray, 
         for ev in p.events:
             if isinstance(ev, Reaction): point_forces.append((p.x, ev.force))
 
-    # Collect ALL moments for BMD (Applied AND Reaction moments)
+    # Collect ALL moments for BMD
     all_discrete_moments = [(x, m.moment) for x, m in beam.applied_moments()]
     for p in beam.points:
         for ev in p.events:

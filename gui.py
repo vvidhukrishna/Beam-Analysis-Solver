@@ -1,12 +1,12 @@
-import sys
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QTextEdit, QGroupBox, QFormLayout, QComboBox, QRadioButton
+    QTextEdit, QGroupBox, QFormLayout, QRadioButton
 )
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
+import numpy as np
 
-# Local imports
+# project imports
 from beam import Beam, Support, PointLoad, AppliedMoment, UniformDistributedLoad, UniformVaryingLoad, FIXED, PINNED, \
     ROLLER
 from solvers import solve_reactions, calculate_sfd_bmd
@@ -15,6 +15,7 @@ from Validation import (
     validate_udl_spec, validate_uvl_spec, validate_points
 )
 from plotting import plot_beam_results
+from history import save_analysis_history
 
 
 class BeamAnalysisApp(QWidget):
@@ -30,7 +31,6 @@ class BeamAnalysisApp(QWidget):
         # --- LEFT PANEL (Inputs) ---
         input_panel = QVBoxLayout()
 
-        # 0. BEAM TYPE (Radio Buttons at the very top)
         self.type_group = QGroupBox("Beam Type")
         type_layout = QHBoxLayout()
         self.radio_simply = QRadioButton("Simply Supported (2 Supports)")
@@ -45,7 +45,7 @@ class BeamAnalysisApp(QWidget):
         self.radio_simply.toggled.connect(self.toggle_beam_type)
         self.radio_cantilever.toggled.connect(self.toggle_beam_type)
 
-        # 1. Beam Settings
+        # Beam Settings
         beam_group = QGroupBox("Beam Parameters")
         beam_layout = QFormLayout()
 
@@ -64,7 +64,7 @@ class BeamAnalysisApp(QWidget):
         beam_group.setLayout(beam_layout)
         input_panel.addWidget(beam_group)
 
-        # 2. Point Loads
+        # Point Loads
         pt_group = QGroupBox("Point Loads & Moments")
         pt_layout = QFormLayout()
         self.pt_loc_input = QLineEdit()
@@ -84,7 +84,7 @@ class BeamAnalysisApp(QWidget):
         pt_group.setLayout(pt_layout)
         input_panel.addWidget(pt_group)
 
-        # 3. Distributed Loads
+        # Distributed Loads
         dist_group = QGroupBox("Distributed Loads")
         dist_layout = QFormLayout()
         self.udl_input = QLineEdit()
@@ -96,7 +96,7 @@ class BeamAnalysisApp(QWidget):
         dist_group.setLayout(dist_layout)
         input_panel.addWidget(dist_group)
 
-        # 4. Buttons and Output
+        # Buttons and Output
         self.calc_btn = QPushButton("Calculate & Plot")
         self.calc_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 10px;")
         self.calc_btn.clicked.connect(self.calculate)
@@ -130,37 +130,35 @@ class BeamAnalysisApp(QWidget):
         try:
             self.result_box.clear()
 
-            # --- Parse Beam ---
+            # Parse Beam
             length = float(self.beam_length_input.text())
             beam = Beam(length)
 
-            # --- Parse Supports ---
+            # Parse Supports
             if self.radio_cantilever.isChecked():
-                # Cantilever rigidly locked to x = 0
                 beam.add_event(0.0, Support(FIXED))
             else:
-                # Simply Supported
                 x_A = validate_support_location(self.supp_a_input.text(), 0.0, length, "Support A")
                 x_B = validate_support_location(self.supp_b_input.text(), length, length, "Support B")
                 validate_support_order(x_A, x_B)
                 beam.add_event(x_A, Support(PINNED))
                 beam.add_event(x_B, Support(ROLLER))
 
-            # --- Parse Point Loads ---
+            # Parse Point Loads
             pt_locs = validate_points(self.pt_loc_input.text(), length)
             if pt_locs:
                 pt_mags = validate_float_list(self.pt_mag_input.text(), len(pt_locs), "Point Load Magnitudes")
                 for loc, mag in zip(pt_locs, pt_mags):
                     beam.add_event(loc, PointLoad(mag))
 
-            # --- Parse Moments ---
+            # Parse Moments
             mom_locs = validate_points(self.mom_loc_input.text(), length)
             if mom_locs:
                 mom_mags = validate_float_list(self.mom_mag_input.text(), len(mom_locs), "Moment Magnitudes")
                 for loc, mag in zip(mom_locs, mom_mags):
                     beam.add_event(loc, AppliedMoment(mag))
 
-            # --- Parse UDLs ---
+            # Parse UDLs
             udl_text = self.udl_input.text().strip()
             if udl_text:
                 for chunk in udl_text.split(";"):
@@ -168,7 +166,7 @@ class BeamAnalysisApp(QWidget):
                         s, e, i = validate_udl_spec(chunk, length)
                         beam.add_distributed_event(UniformDistributedLoad(s, e, i))
 
-            # --- Parse UVLs ---
+            # Parse UVLs
             uvl_text = self.uvl_input.text().strip()
             if uvl_text:
                 for chunk in uvl_text.split(";"):
@@ -176,20 +174,39 @@ class BeamAnalysisApp(QWidget):
                         s, e, w1, w2 = validate_uvl_spec(chunk, length)
                         beam.add_distributed_event(UniformVaryingLoad(s, e, w1, w2))
 
-            # --- Solve ---
+            # Solve
             reactions = solve_reactions(beam)
             x_vals, v_vals, m_vals = calculate_sfd_bmd(beam)
 
-            # --- Output Results ---
+            # Output Results to GUI
             if reactions["type"] == "cantilever":
                 self.result_box.append(" Analysis Successful (Cantilever Beam)")
                 self.result_box.append(f"• Fixed Support at x = {reactions['x_A']} m")
-                self.result_box.append(f"  ↳ Reaction Force: {reactions['R_A']:.2f} kN")
-                self.result_box.append(f"  ↳ Reaction Moment: {reactions['M_A']:.2f} kNm")
+                self.result_box.append(f"  Reaction Force: {reactions['R_A']:.2f} kN")
+                self.result_box.append(f"  Reaction Moment: {reactions['M_A']:.2f} kNm")
             else:
                 self.result_box.append(" Analysis Successful (Simply Supported)")
                 self.result_box.append(f"• Support A (x = {reactions['x_A']} m): {reactions['R_A']:.2f} kN")
                 self.result_box.append(f"• Support B (x = {reactions['x_B']} m): {reactions['R_B']:.2f} kN")
+
+            # --- Save to History JSON ---
+            summary_stats = {
+                "max_shear_force": float(np.max(v_vals)),
+                "min_shear_force": float(np.min(v_vals)),
+                "max_bending_moment": float(np.max(m_vals)),
+                "min_bending_moment": float(np.min(m_vals))
+            }
+
+            save_analysis_history(
+                beam=beam,
+                system_type=reactions["type"],
+                reactions=reactions,
+                x_grid=x_vals,
+                shear_force=v_vals,
+                bending_moment=m_vals,
+                summary_statistics=summary_stats
+            )
+            self.result_box.append("\nSaved to history.json")
 
             # --- Plot ---
             plot_beam_results(beam, x_vals, v_vals, m_vals, self.figure, reactions)
