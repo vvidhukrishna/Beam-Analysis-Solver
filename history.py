@@ -1,6 +1,11 @@
 import json
 from datetime import datetime
-
+import numpy as np
+from plotting import plot_beam_results
+from beam import (
+    Beam, Support, PointLoad, AppliedMoment,
+    UniformDistributedLoad, UniformVaryingLoad
+)
 
 HISTORY_FILE = "history.json"
 
@@ -14,11 +19,7 @@ def save_analysis_history(
     bending_moment,
     summary_statistics,
 ):
-    """
-    Save one successful beam analysis to the history file.
-    """
-
-    # Load existing history if the file exists
+    """Save a completed beam analysis to the history file."""
     try:
         with open(HISTORY_FILE, "r") as file:
             history = json.load(file)
@@ -29,10 +30,8 @@ def save_analysis_history(
     except (FileNotFoundError, json.JSONDecodeError):
         history = []
 
-    # Determine execution number
     execution_number = len(history) + 1
 
-    # Build the history record
     history_entry = {
         "execution": execution_number,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -82,7 +81,6 @@ def save_analysis_history(
         }
     }
 
-    # Add UDLs
     for udl in beam.udls():
         history_entry["beam"]["distributed_loads"].append({
             "type": "udl",
@@ -93,7 +91,6 @@ def save_analysis_history(
             "resultant_force": udl.resultant_force
         })
 
-    # Add UVLs
     for uvl in beam.uvls():
         history_entry["beam"]["distributed_loads"].append({
             "type": "uvl",
@@ -105,9 +102,83 @@ def save_analysis_history(
             "resultant_force": uvl.resultant_force
         })
 
-    # Add the new execution to history
     history.append(history_entry)
 
-    # Write the updated history back to the file
     with open(HISTORY_FILE, "w") as file:
         json.dump(history, file, indent=4)
+
+def load_history():
+    """Load all saved beam analyses from the history file."""
+    try:
+        with open(HISTORY_FILE, "r") as file:
+            history = json.load(file)
+            return history if isinstance(history, list) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+def load_execution(execution_number: int):
+    """Return a saved analysis by execution number."""
+    history = load_history()
+    for entry in history:
+        if entry.get("execution") == execution_number:
+            return entry
+    return None
+
+def reconstruct_beam(entry):
+    """Reconstruct a Beam object from a saved history entry."""
+    beam_data = entry["beam"]
+
+    beam = Beam(beam_data["length"])
+
+    for supp in beam_data.get("supports", []):
+        beam.add_event(supp["x"], Support(supp["type"]))
+
+    for pt in beam_data.get("point_loads", []):
+        beam.add_event(pt["x"], PointLoad(pt["force"]))
+
+    for mom in beam_data.get("applied_moments", []):
+        beam.add_event(mom["x"], AppliedMoment(mom["moment"]))
+
+    for dist in beam_data.get("distributed_loads", []):
+        if dist["type"] == "udl":
+            udl = UniformDistributedLoad(
+                dist["start_x"],
+                dist["end_x"],
+                dist["intensity"]
+            )
+            beam.add_distributed_event(udl)
+
+        elif dist["type"] == "uvl":
+            uvl = UniformVaryingLoad(
+                dist["start_x"],
+                dist["end_x"],
+                dist["w1"],
+                dist["w2"]
+            )
+            beam.add_distributed_event(uvl)
+
+    return beam
+
+def load_analysis_data(entry):
+    """Load stored SFD/BMD analysis data from a history entry."""
+    data = entry["analysis"]["analysis_data"]
+
+    x_grid = np.array(data["x_coords"])
+    V_grid = np.array(data["shear_force"])
+    M_grid = np.array(data["bending_moment"])
+
+    return x_grid, V_grid, M_grid
+
+def plot_history_entry(entry, figure):
+    """Plot a previously saved beam analysis without rerunning the solver."""
+    beam = reconstruct_beam(entry)
+    x_grid, V_grid, M_grid = load_analysis_data(entry)
+    reactions = entry["analysis"]["reactions"]
+
+    plot_beam_results(beam, x_grid, V_grid, M_grid, figure, reactions)
+
+    return beam, reactions
+
+def save_graph(figure, filename):
+    """Save a Matplotlib figure to the specified file."""
+    figure.savefig(filename, bbox_inches="tight")

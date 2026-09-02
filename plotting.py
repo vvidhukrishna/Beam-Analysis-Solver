@@ -5,10 +5,7 @@ from beam import Beam, Support, ReactionMoment, FIXED, PINNED, ROLLER
 
 def plot_beam_results(beam: Beam, x_vals: np.ndarray, V_vals: np.ndarray, M_vals: np.ndarray, fig,
                       reactions_dict: dict):
-    """
-    Renders the Beam Diagram, Shear Force Diagram (SFD), and Bending Moment Diagram (BMD).
-    Renders onto the provided Matplotlib Figure (fig).
-    """
+
     fig.clear()
 
     ax1 = fig.add_subplot(311)
