@@ -9,7 +9,6 @@ from beam import (
 
 HISTORY_FILE = "history.json"
 
-
 def save_analysis_history(
     beam,
     system_type,
