@@ -4,14 +4,14 @@ from unittest.mock import patch
 from PyQt5.QtCore import Qt
 from gui import BeamAnalysisApp
 
-
 @pytest.fixture
 def app(qtbot):
     """Fixture to set up the GUI for testing."""
     test_app = BeamAnalysisApp()
     qtbot.addWidget(test_app)
+    test_app.show()
+    qtbot.waitExposed(test_app)
     return test_app
-
 
 def test_initial_state(app):
     """Test the default state of the GUI."""
@@ -19,7 +19,7 @@ def test_initial_state(app):
     assert app.radio_simply.isChecked() is True
     assert app.supp_a_input.isVisible() is True
     assert app.supp_b_input.isVisible() is True
-    assert app.beam_length_input.text() == "10"
+    assert app.beam_length_input.value() == 10.0
 
 
 def test_toggle_beam_type(app, qtbot):
@@ -37,8 +37,8 @@ def test_toggle_beam_type(app, qtbot):
 
 
 def test_calculate_invalid_input(app, qtbot):
-    """Test GUI response to invalid input (string instead of float)."""
-    app.beam_length_input.setText("invalid_length")
+    app.supp_a_input.setValue(9.0)
+    app.supp_b_input.setValue(5.0)
     qtbot.mouseClick(app.calc_btn, Qt.LeftButton)
 
     assert "Error" in app.result_box.toPlainText()
@@ -50,7 +50,6 @@ def test_calculate_invalid_input(app, qtbot):
 @patch("gui.calculate_sfd_bmd")
 def test_calculate_saves_history(mock_calc, mock_solve, mock_plot, mock_save_history, app, qtbot):
     """Test that a successful calculation triggers saving to history and plotting."""
-    # Mock the math solvers to return standard data
     mock_solve.return_value = {"type": "simply_supported", "R_A": 10, "R_B": 10, "x_A": 0, "x_B": 10}
     mock_calc.return_value = (np.array([0, 10]), np.array([5, -5]), np.array([0, 25]))
 
@@ -139,7 +138,6 @@ def test_save_current_graph(mock_info, mock_save, mock_file_dialog, app):
 @patch("gui.save_graph")
 def test_save_current_graph_cancel(mock_save, mock_file_dialog, app):
     """Test that cancelling the save graph dialog does not throw errors or save."""
-    # Simulate user pressing "Cancel"
     mock_file_dialog.return_value = ("", "")
 
     app.save_current_graph()
