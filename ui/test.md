@@ -39,8 +39,7 @@ V3.5.0 is the final release of Beam Analysis Solver. The final version represent
 ## Example Output
 The final GUI combines beam inputs, analysis results, and engineering diagrams into a single interface.
 
-![Beam Analysis Solver GUI](demo1.png)
-![Beam Analysis Solver GUI](demo2.png)
+![Beam Analysis Solver GUI](Screenshot%202026-08-13%20214646.png)
 
 ## How It Works
 The solver uses an event-based beam model to represent the physical entities acting on a beam.

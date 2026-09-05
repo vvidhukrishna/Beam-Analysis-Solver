@@ -68,10 +68,8 @@ def test_calculate_saves_history(mock_calc, mock_solve, mock_plot, mock_save_his
 @patch("gui.load_history")
 def test_refresh_history(mock_load_history, app):
     """Test that the history dropdown populates correctly."""
-    mock_load_history.return_value = [
-        {"execution": 1, "timestamp": "2026-09-03T10:00:00"},
-        {"execution": 2, "timestamp": "2026-09-03T10:05:00"}
-    ]
+    mock_load_history.return_value = [{"execution": 1, "timestamp": "2026-09-03T10:00:00"},
+                                      {"execution": 2, "timestamp": "2026-09-03T10:05:00"}]
 
     app.refresh_history()
 
@@ -87,20 +85,14 @@ def test_load_selected_history_valid(mock_plot, mock_load_execution, app):
     app.history_combo.addItem("Test Exec", 1)
     app.history_combo.setCurrentIndex(0)
 
-    mock_entry = {
-        "analysis": {
-            "summary_statistics": {
+    mock_entry = {"analysis": {"summary_statistics": {
                 "max_shear_force": 15.0,
                 "min_shear_force": -10.0,
                 "max_bending_moment": 25.0,
-                "min_bending_moment": 0.0
-            }
-        }
-    }
+                "min_bending_moment": 0.0}}}
     mock_load_execution.return_value = mock_entry
 
     app.load_selected_history()
-
     mock_load_execution.assert_called_once_with(1)
     mock_plot.assert_called_once_with(mock_entry, app.figure)
 
@@ -114,9 +106,7 @@ def test_load_selected_history_valid(mock_plot, mock_load_execution, app):
 def test_load_selected_history_none(mock_warning, app):
     """Test behavior when user tries to load history with no selection."""
     app.history_combo.clear()
-
     app.load_selected_history()
-
     mock_warning.assert_called_once()
 
 
@@ -127,9 +117,7 @@ def test_save_current_graph(mock_info, mock_save, mock_file_dialog, app):
     """Test the graph saving functionality."""
     # Simulate user choosing a file name
     mock_file_dialog.return_value = ("test_graph.png", "")
-
     app.save_current_graph()
-
     mock_save.assert_called_once_with(app.figure, "test_graph.png")
     mock_info.assert_called_once()
 
@@ -139,7 +127,5 @@ def test_save_current_graph(mock_info, mock_save, mock_file_dialog, app):
 def test_save_current_graph_cancel(mock_save, mock_file_dialog, app):
     """Test that cancelling the save graph dialog does not throw errors or save."""
     mock_file_dialog.return_value = ("", "")
-
     app.save_current_graph()
-
     mock_save.assert_not_called()

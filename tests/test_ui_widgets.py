@@ -1,22 +1,15 @@
 import pytest
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QToolButton
-
 from ui.widgets import LoadTable
 
-POINT_LOAD_COLUMNS = [
-    {"label": "Location", "unit": "m", "decimals": 2, "minimum": 0.0, "maximum": 100.0, "default": 0.0},
-    {"label": "Magnitude", "unit": "kN", "decimals": 2, "minimum": -1000.0, "maximum": 1000.0, "default": -10.0},
-]
+POINT_LOAD_COLUMNS = [{"label": "Location", "unit": "m", "decimals": 2, "minimum": 0.0, "maximum": 100.0, "default": 0.0},
+    {"label": "Magnitude", "unit": "kN", "decimals": 2, "minimum": -1000.0, "maximum": 1000.0, "default": -10.0},]
 
 
 @pytest.fixture
 def table(qtbot):
-    widget = LoadTable(
-        POINT_LOAD_COLUMNS,
-        add_label="+ Add Point Load",
-        empty_text="No point loads defined."
-    )
+    widget = LoadTable(POINT_LOAD_COLUMNS, add_label="+ Add Point Load", empty_text="No point loads defined.")
     qtbot.addWidget(widget)
     widget.show()
     qtbot.waitExposed(widget)

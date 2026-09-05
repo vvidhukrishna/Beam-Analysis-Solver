@@ -9,8 +9,7 @@ def draw_fixed_support(ax, x, L):
     wall_width = 0.035 * L
     wall_height = 1.8
 
-    wall = patches.Rectangle(
-        (x - wall_width, -0.9), wall_width, wall_height, facecolor="#AEB6BE", edgecolor="#7F8992", linewidth=1.2)
+    wall = patches.Rectangle((x - wall_width, -0.9), wall_width, wall_height, facecolor="#AEB6BE", edgecolor="#7F8992", linewidth=1.2)
     ax.add_patch(wall)
 
     hatch_spacing = 0.12 * L
@@ -26,7 +25,8 @@ def draw_pinned_support(ax, x, L):
         closed=True, facecolor="#AEB6BE", edgecolor="#7F8992", linewidth=1.2)
     ax.add_patch(triangle)
 
-    ax.plot([x - triangle_width * 1.25, x + triangle_width * 1.25], [-triangle_height, -triangle_height], color="#7F8992", linewidth=2)
+    ax.plot([x - triangle_width * 1.25, x + triangle_width * 1.25], [-triangle_height, -triangle_height],
+        color="#7F8992", linewidth=2)
 
     hatch_spacing = triangle_width * 0.45
     for i in range(-2, 3):
@@ -46,7 +46,8 @@ def draw_roller_support(ax, x, L):
     roller_y = -triangle_height - roller_radius
 
     for dx in (-triangle_width * 0.45, triangle_width * 0.45):
-        roller = patches.Circle((x + dx, roller_y), roller_radius, facecolor="#D5D9DD", edgecolor="#7F8992", linewidth=1.2)
+        roller = patches.Circle((x + dx, roller_y), roller_radius,
+            facecolor="#D5D9DD", edgecolor="#7F8992", linewidth=1.2)
         ax.add_patch(roller)
 
     ground_y = roller_y - roller_radius
@@ -59,7 +60,7 @@ def draw_roller_support(ax, x, L):
         ax.plot([hatch_x, hatch_x - hatch_spacing * 0.4], [ground_y, ground_y - 0.16], color="#7F8992", linewidth=1)
 
 
-def draw_point_moment(ax, x, moment, L):
+def draw_point_moment(ax, x, moment):
     radius = 0.32
     arrow_colour = "#C7A6E6"
 
@@ -78,7 +79,7 @@ def draw_point_moment(ax, x, moment, L):
     ax.text(x, radius + 0.12, f"{abs(moment.moment):.1f} kNm", color=arrow_colour, ha="center", va="bottom")
 
 
-def draw_reaction_moment(ax, x, moment, L):
+def draw_reaction_moment(ax, x, moment):
     reaction_moment_color = "#B8A1D9"
     radius = 0.32
 
@@ -91,12 +92,13 @@ def draw_reaction_moment(ax, x, moment, L):
         start = (x - radius, 0)
         end = (x + radius, 0)
 
-    arrow = patches.FancyArrowPatch(start, end,connectionstyle=connection_style, arrowstyle="->", mutation_scale=16, linewidth=2.5, color=reaction_moment_color)
+    arrow = patches.FancyArrowPatch(start, end,connectionstyle=connection_style,
+                arrowstyle="->", mutation_scale=16, linewidth=2.5, color=reaction_moment_color)
     ax.add_patch(arrow)
 
     ax.text(x, radius + 0.12, f"M_R = {abs(moment):.1f} kNm", color=reaction_moment_color, ha="center", va="bottom")
 
-def draw_reaction(ax, x, force, max_reaction, L, label="R"):
+def draw_reaction(ax, x, force, max_reaction, label="R"):
     reaction_color = "#9FD3C7"
 
     if max_reaction > 0:
@@ -109,24 +111,19 @@ def draw_reaction(ax, x, force, max_reaction, L, label="R"):
     sign = 1 if force > 0 else -1
     y_start = arrow_length * sign
 
-    ax.annotate("", xy=(x, 0), xytext=(x, y_start), arrowprops=dict(facecolor=reaction_color, edgecolor=reaction_color, shrink=0.05, width=2, headwidth=8))
+    ax.annotate("", xy=(x, 0), xytext=(x, y_start),
+        arrowprops=dict(facecolor=reaction_color, edgecolor=reaction_color, shrink=0.05, width=2, headwidth=8))
 
     label_offset = 0.18
 
-    ax.text(x, (arrow_length + label_offset) * sign, f"{label} = {abs(force):.1f} kN", color=reaction_color, ha="center", va="center")
+    ax.text(x, (arrow_length + label_offset) * sign, f"{label} = {abs(force):.1f} kN",
+        color=reaction_color, ha="center", va="center")
 
 
-def plot_beam_results(
-    beam: Beam,
-    x_vals: np.ndarray,
-    V_vals: np.ndarray,
-    M_vals: np.ndarray,
-    fig,
-    reactions_dict: dict
-):
+def plot_beam_results(beam: Beam, x_vals: np.ndarray, V_vals: np.ndarray, M_vals: np.ndarray, fig, reactions_dict: dict):
     fig.clear()
 
-    TEXT_COLOR = "#E6E9EC"
+    text_colour = "#E6E9EC"
 
     fig.patch.set_facecolor("#2F3942")
 
@@ -136,20 +133,20 @@ def plot_beam_results(
 
     for ax in (ax1, ax2, ax3):
         ax.set_facecolor("#3B4650")
-        ax.tick_params(colors=TEXT_COLOR)
-        ax.xaxis.label.set_color(TEXT_COLOR)
-        ax.yaxis.label.set_color(TEXT_COLOR)
-        ax.title.set_color(TEXT_COLOR)
+        ax.tick_params(colors=text_colour)
+        ax.xaxis.label.set_color(text_colour)
+        ax.yaxis.label.set_color(text_colour)
+        ax.title.set_color(text_colour)
 
-    L = beam.length
+    _len_ = beam.length
 
     # ------------------------------------------------------------------
     # Beam diagram
     # ------------------------------------------------------------------
 
-    ax1.plot([0, L], [0, 0], color="#D5D9DD", linewidth=4, solid_capstyle="butt")
+    ax1.plot([0, _len_], [0, 0], color="#D5D9DD", linewidth=4, solid_capstyle="butt")
 
-    ax1.set_xlim(-0.1 * L, L * 1.1)
+    ax1.set_xlim(-0.1 * _len_, _len_ * 1.1)
     ax1.set_ylim(-2, 2)
     ax1.axis("off")
 
@@ -164,19 +161,19 @@ def plot_beam_results(
             f"R_B (x={reactions_dict['x_B']}m) = "
             f"{reactions_dict['R_B']:.2f} kN")
 
-    ax1.text(0.5, 1.08, "Beam Diagram\n", transform=ax1.transAxes, ha="center", va="bottom", fontsize=16, fontweight="bold", color=TEXT_COLOR)
-    ax1.text(0.5, 1.05, rxn_text, transform=ax1.transAxes, ha="center", va="bottom", fontsize=11, fontweight="bold", color=TEXT_COLOR)
+    ax1.text(0.5, 1.08, "Beam Diagram\n", transform=ax1.transAxes, ha="center", va="bottom", fontsize=16, fontweight="bold", color=text_colour)
+    ax1.text(0.5, 1.05, rxn_text, transform=ax1.transAxes, ha="center", va="bottom", fontsize=11, fontweight="bold", color=text_colour)
 
     # Supports
     for p in beam.points:
         for ev in p.events:
             if isinstance(ev, Support):
                 if ev.support_type == FIXED:
-                    draw_fixed_support(ax1, p.x, L)
+                    draw_fixed_support(ax1, p.x, _len_)
                 elif ev.support_type == PINNED:
-                    draw_pinned_support(ax1, p.x, L)
+                    draw_pinned_support(ax1, p.x, _len_)
                 elif ev.support_type == ROLLER:
-                    draw_roller_support(ax1, p.x, L)
+                    draw_roller_support(ax1, p.x, _len_)
 
     # Point loads
     point_loads = list(beam.point_loads())
@@ -201,7 +198,7 @@ def plot_beam_results(
 
     # Applied moments
     for x, moment in beam.applied_moments():
-        draw_point_moment(ax1, x, moment, L)
+        draw_point_moment(ax1, x, moment)
 
     # Reaction forces and moments
     if reactions_dict["type"] == "cantilever":
@@ -209,16 +206,16 @@ def plot_beam_results(
         reaction_moment = reactions_dict["M_A"]
 
         max_reaction = abs(reaction_force)
-        draw_reaction(ax1, reactions_dict["x_A"], reaction_force, max_reaction, L, label="R")
-        draw_reaction_moment(ax1, reactions_dict["x_A"], reaction_moment, L)
+        draw_reaction(ax1, reactions_dict["x_A"], reaction_force, max_reaction, label="R")
+        draw_reaction_moment(ax1, reactions_dict["x_A"], reaction_moment)
 
     else:
-        reaction_A = reactions_dict["R_A"]
-        reaction_B = reactions_dict["R_B"]
+        reaction_a = reactions_dict["R_A"]
+        reaction_b = reactions_dict["R_B"]
 
-        max_reaction = max(abs(reaction_A), abs(reaction_B))
-        draw_reaction(ax1, reactions_dict["x_A"], reaction_A, max_reaction, L, label="R_A")
-        draw_reaction(ax1, reactions_dict["x_B"], reaction_B, max_reaction, L, label="R_B")
+        max_reaction = max(abs(float(reaction_a)), abs(float(reaction_b)))
+        draw_reaction(ax1, reactions_dict["x_A"], reaction_a, max_reaction, label="R_A")
+        draw_reaction(ax1, reactions_dict["x_B"], reaction_b, max_reaction, label="R_B")
 
     # UDL
     for udl in beam.udls():
@@ -248,7 +245,7 @@ def plot_beam_results(
 
     ax2.axhline(0, color="black", linewidth=1)
 
-    ax2.set_xlim(0, L)
+    ax2.set_xlim(0, _len_)
     ax2.set_ylabel("Shear Force (kN)")
     ax2.set_title("Shear Force Diagram")
 
@@ -264,7 +261,7 @@ def plot_beam_results(
 
     ax3.axhline(0, color="black", linewidth=1)
 
-    ax3.set_xlim(0, L)
+    ax3.set_xlim(0, _len_)
     ax3.set_xlabel("Beam Length (m)")
     ax3.set_ylabel("Bending Moment (kNm)")
     ax3.set_title("Bending Moment Diagram")

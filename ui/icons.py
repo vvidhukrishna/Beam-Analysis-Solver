@@ -1,21 +1,10 @@
-"""
-A small, self-contained icon set for the application toolbar and buttons.
-
-Rather than pulling in an external icon-font dependency (qtawesome, etc.)
-for a handful of glyphs, icons are defined as plain SVG path data and
-rasterized on demand with Qt's own QtSvg module (already part of the
-PyQt5 distribution -- no new dependency). This keeps the icon language
-coherent, monochrome and easy to recolor per design-system state
-(default / hover / accent) without shipping image assets.
-"""
-
 from PyQt5.QtCore import QByteArray, Qt
 from PyQt5.QtGui import QIcon, QPainter, QPixmap
 from PyQt5.QtSvg import QSvgRenderer
 
-_STROKE = 'stroke="{color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"'
+_stroke = 'stroke="{color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"'
 
-_SVG_BODY = {
+_svg_body = {
     # sheet / new document
     "new": '<path {s} d="M6 3h8l4 4v14H6z"/><path {s} d="M14 3v4h4"/><path {s} d="M9 13h6M9 16.5h6"/>',
     # play triangle
@@ -55,7 +44,7 @@ _SVG_BODY = {
 
 
 def _svg_source(name: str, color: str) -> str:
-    body = _SVG_BODY[name].format(s=_STROKE.format(color=color), color=color)
+    body = _svg_body[name].format(s=_stroke.format(color=color), color=color)
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">{body}</svg>'
 
 

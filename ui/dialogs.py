@@ -1,21 +1,6 @@
-"""
-Dialog windows for the Beam Analysis Solver.
-
-HistoryDialog is a presentation layer only: it reads already-loaded
-history entries (the same data returned by history.load_history()) and,
-on selection, hands the chosen execution number back to the caller via a
-callback. It never talks to history.json directly, so the existing
-history storage/loading mechanism in history.py is untouched.
-"""
-
 from datetime import datetime
-
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
-    QPushButton
-)
-
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton)
 from ui.styles import PALETTE
 
 
@@ -134,9 +119,7 @@ class AboutDialog(QDialog):
 
         layout.addStretch()
 
-        convention = QLabel(
-            "Sign convention:  \u2193 loads negative   \u2022   \u2191 loads positive   \u2022   CCW moments positive"
-        )
+        convention = QLabel("Sign convention:  \u2193 loads negative   \u2022   \u2191 loads positive   \u2022   CCW moments positive")
         convention.setProperty("role", "hint")
         convention.setWordWrap(True)
         layout.addWidget(convention)

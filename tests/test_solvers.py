@@ -50,7 +50,6 @@ def test_solve_reactions_udl():
     beam.add_event(10, Support(ROLLER))
 
     beam.add_distributed_event(UniformDistributedLoad(0, 10, -2.0))
-
     solve_reactions(beam)
     rxns = get_reaction_forces(beam)
 
@@ -64,7 +63,6 @@ def test_solve_reactions_uvl():
     beam.add_event(10, Support(ROLLER))
 
     beam.add_distributed_event(UniformVaryingLoad(0, 10, 0, -3.0))
-
     solve_reactions(beam)
     rxns = get_reaction_forces(beam)
 
@@ -78,7 +76,6 @@ def test_solve_reactions_applied_moment():
     beam.add_event(10, Support(ROLLER))
 
     beam.add_event(5, AppliedMoment(20.0))
-
     solve_reactions(beam)
     rxns = get_reaction_forces(beam)
 
@@ -92,12 +89,10 @@ def test_solve_reactions_cantilever_point_load():
     beam.add_event(5, PointLoad(-20.0))
 
     solve_reactions(beam)
-
     rxns = get_reaction_forces(beam)
     moments = get_reaction_moments(beam)
 
     assert rxns[0.0] == pytest.approx(20.0)
-
     assert moments[0.0] == pytest.approx(100.0)
 
 
@@ -111,8 +106,7 @@ def test_solve_reactions_cantilever_distributed():
     moments = get_reaction_moments(beam)
 
     assert rxns[0.0] == pytest.approx(20.0)
-    # Centroid at 5m -> Moment = -20 * 5 = -100 -> Reaction = 100
-    assert moments[0.0] == pytest.approx(100.0)
+    assert moments[0.0] == pytest.approx(100.0)  # Centroid at 5m -> Moment = -20 * 5 = -100 -> Reaction = 100
 
 
 def test_sfd_bmd_central_point_load():
@@ -120,11 +114,10 @@ def test_sfd_bmd_central_point_load():
     beam.add_event(0, Support(PINNED))
     beam.add_event(10, Support(ROLLER))
     beam.add_event(5, PointLoad(-20.0))
-    solve_reactions(beam)  # Required before calculating diagrams
-
+    solve_reactions(beam)
     x_arr, sfd, bmd = calculate_sfd_bmd(beam)
-
     idx_center = np.argmin(np.abs(x_arr - 5.0))
+
     assert bmd[idx_center] == pytest.approx(50.0)
 
     idx_left = np.argmin(np.abs(x_arr - 2.5))
@@ -140,9 +133,7 @@ def test_sfd_bmd_point_load_jump():
     beam.add_event(10, Support(ROLLER))
     beam.add_event(5, PointLoad(-20.0))
     solve_reactions(beam)
-
     x_arr, sfd, _ = calculate_sfd_bmd(beam)
-
     idx_before = np.argmin(np.abs(x_arr - (5.0 - 1e-7)))
     idx_after = np.argmin(np.abs(x_arr - (5.0 + 1e-7)))
 
@@ -157,13 +148,11 @@ def test_sfd_bmd_applied_moment_jump():
     beam.add_event(10, Support(ROLLER))
     beam.add_event(5, AppliedMoment(20.0))
     solve_reactions(beam)
-
     x_arr, _, bmd = calculate_sfd_bmd(beam)
-
     idx_before = np.argmin(np.abs(x_arr - (5.0 - 1e-7)))
     idx_after = np.argmin(np.abs(x_arr - (5.0 + 1e-7)))
-
     jump = bmd[idx_after] - bmd[idx_before]
+
     assert jump == pytest.approx(20.0)
 
 
@@ -189,7 +178,6 @@ def test_sfd_bmd_zero_load_beam():
     beam = Beam(10.0)
     beam.add_event(0, Support(PINNED))
     beam.add_event(10, Support(ROLLER))
-
     solve_reactions(beam)
     x_arr, sfd, bmd = calculate_sfd_bmd(beam)
 

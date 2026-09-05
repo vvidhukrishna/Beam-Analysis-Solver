@@ -9,8 +9,7 @@ from Validation import (
     validate_support_location,
     validate_uvl_count,
     validate_uvl_spec,
-    analyze_input_state,
-)
+    analyze_input_state,)
 
 
 def test_validate_support_count_valid():
@@ -39,9 +38,7 @@ def test_validate_support_order_invalid():
 
 def test_validate_support_location():
     assert validate_support_location("5.0", 0.0, 10.0, "Support A") == 5.0
-
     assert validate_support_location("", 2.5, 10.0, "Support A") == 2.5
-
     with pytest.raises(ValueError, match="must be between 0 and beam length"): validate_support_location("15.0", 0.0, 10.0, "Support A")
 
 
@@ -88,7 +85,6 @@ def test_validate_udl_spec_valid():
 def test_validate_udl_spec_invalid():
     with pytest.raises(ValueError, match="requires exactly 3 values"):
         validate_udl_spec("0, 5", 10.0)
-
     with pytest.raises(ValueError, match="Invalid UDL bounds"):
         validate_udl_spec("5, 2, -10.0", 10.0)
     with pytest.raises(ValueError, match="Invalid UDL bounds"):
@@ -114,7 +110,6 @@ def test_analyze_input_state_float():
     assert analyze_input_state("-", "float") == "incomplete"
     assert analyze_input_state("e-", "float") == "incomplete"
     assert analyze_input_state("15.5", "float") == "valid"
-
     assert analyze_input_state("-5.0", "float") == "invalid"
     assert analyze_input_state("abc", "float") == "invalid"
 

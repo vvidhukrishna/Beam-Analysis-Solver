@@ -1,6 +1,4 @@
-from beam import (
-    PINNED, ROLLER, FIXED
-)
+from beam import (PINNED, ROLLER, FIXED)
 from get_beam_data import get_beam_data
 
 def test_get_beam_data_simply_supported(monkeypatch):
@@ -16,12 +14,12 @@ def test_get_beam_data_simply_supported(monkeypatch):
         "0"  # uvl count
     ])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
-
     beam = get_beam_data()
 
     assert beam.length == 10.0
 
     supports = list(beam.supports())
+
     assert len(supports) == 2
     assert supports[0][0] == 0.0
     assert supports[0][1].support_type == PINNED
@@ -29,6 +27,7 @@ def test_get_beam_data_simply_supported(monkeypatch):
     assert supports[1][1].support_type == ROLLER
 
     pt_loads = list(beam.point_loads())
+
     assert len(pt_loads) == 1
     assert pt_loads[0][0] == 5.0
     assert pt_loads[0][1].force == -20.0
@@ -51,11 +50,13 @@ def test_get_beam_data_cantilever(monkeypatch):
     assert beam.length == 8.0
 
     supports = list(beam.supports())
+
     assert len(supports) == 1
     assert supports[0][0] == 0.0
     assert supports[0][1].support_type == FIXED
 
     moments = list(beam.applied_moments())
+
     assert len(moments) == 1
     assert moments[0][0] == 4.0
     assert moments[0][1].moment == 15.0
@@ -75,7 +76,6 @@ def test_get_beam_data_with_distributed_loads(monkeypatch):
         "5, 10, 0, -5.0"  # uvl spec: start, end, w1, w2
     ])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
-
     beam = get_beam_data()
 
     assert len(beam.distributed_events) == 2
@@ -108,7 +108,6 @@ def test_get_beam_data_invalid_length_retry(monkeypatch):
         "0"  # uvl count
     ])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
-
     beam = get_beam_data()
 
     assert beam.length == 10.0

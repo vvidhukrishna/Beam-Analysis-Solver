@@ -1,24 +1,4 @@
-"""
-Design system for the Beam Analysis Solver desktop application.
-
-This module centralizes the visual language of the application: a single
-source of truth for color, typography and the compiled Qt stylesheet (QSS).
-Nothing engineering-related lives here -- this is presentation only.
-
-Palette philosophy
--------------------
-Dark graphite/slate chrome (inspired by professional CAE tools such as
-Fusion 360 / ANSYS Mechanical) with a restrained steel-blue accent, a
-teal/cyan secondary highlight, and muted status colors. The plotting
-canvas itself is left on its natural light background (see plotting.py,
-which is intentionally untouched) so the engineering diagrams remain the
-sharpest, most readable element in the window -- exactly like a CAD
-viewport sitting inside a dark application frame.
-"""
-
-# --------------------------------------------------------------------------- #
 # Palette
-# --------------------------------------------------------------------------- #
 PALETTE = {
     # Chrome / surfaces
     "bg_app": "#1B1F24",
@@ -65,7 +45,6 @@ PALETTE = {
 
 FONT_FAMILY = '"Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif'
 MONO_FAMILY = '"Cascadia Mono", "Consolas", "JetBrains Mono", "Courier New", monospace'
-
 BASE_PT = 9
 
 

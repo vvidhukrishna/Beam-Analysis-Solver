@@ -1,18 +1,6 @@
-"""
-Reusable widgets for the Beam Analysis Solver UI.
-
-These are generic, presentation-only building blocks with no engineering
-logic of their own -- they are composed together in gui.py, which remains
-responsible for orchestrating validation and the beam/solver backend.
-"""
-
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton,
-    QToolButton, QTableWidget, QHeaderView, QAbstractItemView,
-    QDoubleSpinBox, QSizePolicy
-)
-
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton,
+    QToolButton, QTableWidget, QHeaderView, QAbstractItemView, QDoubleSpinBox, QSizePolicy)
 from ui import icons
 from ui.styles import PALETTE
 
@@ -20,9 +8,7 @@ ROW_HEIGHT = 30
 HEADER_HEIGHT = 26
 
 
-# --------------------------------------------------------------------------- #
 # Layout helpers
-# --------------------------------------------------------------------------- #
 def card(title: str = None, hint: str = None):
     """A QFrame styled as a property-panel 'card' section. Returns (frame, content_layout)."""
     frame = QFrame()
@@ -67,8 +53,7 @@ def field_row(label_text: str, widget: QWidget, label_width: int = 128) -> QWidg
 
 
 def labeled_spinbox(label_text: str, unit: str, value: float, minimum: float = 0.0,
-                     maximum: float = 100000.0, decimals: int = 2, step: float = 0.5,
-                     label_width: int = 128) -> tuple:
+    maximum: float = 100000.0, decimals: int = 2, step: float = 0.5, label_width: int = 128) -> tuple:
     """Builds a [label][QDoubleSpinBox with unit suffix] row. Returns (row_widget, spinbox)."""
     spin = QDoubleSpinBox()
     spin.setDecimals(decimals)
@@ -80,27 +65,14 @@ def labeled_spinbox(label_text: str, unit: str, value: float, minimum: float = 0
     return field_row(label_text, spin, label_width), spin
 
 
-# --------------------------------------------------------------------------- #
 # Structured load table
-# --------------------------------------------------------------------------- #
 class LoadTable(QWidget):
     """
     A compact, structured editor for a list of numeric load rows
     (point loads, moments, UDLs, UVLs), replacing the legacy
     comma-separated free-text pattern with real numeric, unit-aware
     controls.
-
-    ``columns`` is a list of dicts, one per numeric column:
-        {"label": str, "unit": str, "decimals": int (opt),
-         "minimum": float (opt), "maximum": float (opt),
-         "default": float (opt), "step": float (opt)}
-
-    The parsed values are always exposed as plain tuples of floats via
-    ``get_rows()``, so callers (gui.py) don't need to know this is backed
-    by a QTableWidget -- keeping the presentation layer decoupled from
-    beam/validation logic.
     """
-
     rows_changed = pyqtSignal()
 
     def __init__(self, columns, add_label="+ Add Row", empty_text="No entries defined.", parent=None):
@@ -149,7 +121,6 @@ class LoadTable(QWidget):
 
         self._sync_height()
 
-    # -- public API ---------------------------------------------------- #
     def add_row(self, values=None):
         row = self.table.rowCount()
         self.table.insertRow(row)
@@ -181,7 +152,6 @@ class LoadTable(QWidget):
         remove_btn.clicked.connect(self._make_remove_handler(remove_container))
         h.addWidget(remove_btn)
         self.table.setCellWidget(row, len(self.columns), remove_container)
-
         self._sync_height()
         self.rows_changed.emit()
 
@@ -199,9 +169,7 @@ class LoadTable(QWidget):
         """Return a list of tuples, one per row, of the raw float values (column order preserved)."""
         rows = []
         for row in range(self.table.rowCount()):
-            values = tuple(
-                self.table.cellWidget(row, col).value() for col in range(len(self.columns))
-            )
+            values = tuple(self.table.cellWidget(row, col).value() for col in range(len(self.columns)))
             rows.append(values)
         return rows
 
@@ -213,7 +181,6 @@ class LoadTable(QWidget):
         self._sync_height()
         self.rows_changed.emit()
 
-    # -- internal -------------------------------------------------------- #
     def _sync_height(self):
         n = self.table.rowCount()
         self.table.setVisible(n > 0)

@@ -1,31 +1,21 @@
 import numpy as np
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QKeySequence
-from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QRadioButton, QComboBox, QDoubleSpinBox, QFormLayout, QFrame,
-    QScrollArea, QSplitter, QSizePolicy, QToolBar, QAction, QMessageBox,
-    QFileDialog, QTextEdit
-)
-from matplotlib.backends.backend_qt5agg import (
-    FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT
-)
-from matplotlib.figure import Figure
+from PyQt5.QtGui import QKeySequence, QIcon
+from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QRadioButton, QComboBox,
+    QDoubleSpinBox, QFormLayout, QFrame, QScrollArea, QSplitter, QSizePolicy, QToolBar, QAction, QMessageBox, QFileDialog, QTextEdit)
 
-from beam import (
-    Beam, Support, PointLoad, AppliedMoment, UniformDistributedLoad,
-    UniformVaryingLoad, FIXED, PINNED, ROLLER
-)
+from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT)
+from matplotlib.figure import Figure
+from beam import (Beam, Support, PointLoad, AppliedMoment, UniformDistributedLoad,
+    UniformVaryingLoad, FIXED, PINNED, ROLLER)
+
 from solvers import solve_reactions, calculate_sfd_bmd
-from Validation import (
-    validate_support_location, validate_support_order,
-    validate_udl_spec, validate_uvl_spec, validate_points
-)
+from Validation import (validate_support_location, validate_support_order,
+    validate_udl_spec, validate_uvl_spec, validate_points)
+
 from plotting import plot_beam_results
-from history import (
-    save_analysis_history, load_history, load_execution,
-    plot_history_entry, save_graph
-)
+from history import (save_analysis_history, load_history, load_execution,
+    plot_history_entry, save_graph)
 
 from ui.styles import build_stylesheet, PALETTE, MONO_FAMILY
 from ui.widgets import card, LoadTable
@@ -40,7 +30,7 @@ class BeamAnalysisApp(QMainWindow):
         self.resize(1280, 800)
         self.setMinimumSize(1040, 660)
         self.setStyleSheet(build_stylesheet())
-
+        self.setWindowIcon(QIcon("logo.png"))
         self._build_toolbar()
 
         central = QWidget()
@@ -79,9 +69,7 @@ class BeamAnalysisApp(QMainWindow):
         self.result_box.setHtml(self._render_placeholder_html())
         self.refresh_history()
 
-    # ------------------------------------------------------------------ #
     # Header / toolbar
-    # ------------------------------------------------------------------ #
     def _build_toolbar(self):
         toolbar = QToolBar("Main")
         toolbar.setObjectName("mainToolBar")
@@ -145,9 +133,7 @@ class BeamAnalysisApp(QMainWindow):
 
         return toolbar
 
-    # ------------------------------------------------------------------ #
     # Left: model / loading panel
-    # ------------------------------------------------------------------ #
     def _build_model_panel(self):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -206,7 +192,6 @@ class BeamAnalysisApp(QMainWindow):
 
         self.radio_simply.toggled.connect(self.toggle_beam_type)
         self.radio_cantilever.toggled.connect(self.toggle_beam_type)
-
         return frame
 
     def _build_beam_parameters_card(self):
@@ -255,7 +240,6 @@ class BeamAnalysisApp(QMainWindow):
         self.fixed_support_hint.setProperty("role", "hint")
         self.fixed_support_hint.setVisible(False)
         content.addWidget(self.fixed_support_hint)
-
         return frame
 
     def _build_point_loads_card(self):
@@ -265,11 +249,9 @@ class BeamAnalysisApp(QMainWindow):
                 {"label": "Location", "unit": "m", "decimals": 2, "minimum": 0.0,
                  "maximum": 100000.0, "default": 0.0, "step": 0.5},
                 {"label": "Magnitude", "unit": "kN", "decimals": 2, "minimum": -1_000_000.0,
-                 "maximum": 1_000_000.0, "default": -10.0, "step": 1.0},
-            ],
+                 "maximum": 1_000_000.0, "default": -10.0, "step": 1.0},],
             add_label="+ Add Point Load",
-            empty_text="No point loads defined.",
-        )
+            empty_text="No point loads defined.",)
         content.addWidget(self.point_loads_table)
         return frame
 
@@ -280,11 +262,9 @@ class BeamAnalysisApp(QMainWindow):
                 {"label": "Location", "unit": "m", "decimals": 2, "minimum": 0.0,
                  "maximum": 100000.0, "default": 0.0, "step": 0.5},
                 {"label": "Moment", "unit": "kNm", "decimals": 2, "minimum": -1_000_000.0,
-                 "maximum": 1_000_000.0, "default": 10.0, "step": 1.0},
-            ],
+                 "maximum": 1_000_000.0, "default": 10.0, "step": 1.0},],
             add_label="+ Add Moment",
-            empty_text="No applied moments defined.",
-        )
+            empty_text="No applied moments defined.",)
         content.addWidget(self.moments_table)
         return frame
 
@@ -301,11 +281,9 @@ class BeamAnalysisApp(QMainWindow):
                 {"label": "End", "unit": "m", "decimals": 2, "minimum": 0.0,
                  "maximum": 100000.0, "default": 1.0, "step": 0.5},
                 {"label": "Intensity", "unit": "kN/m", "decimals": 2, "minimum": -1_000_000.0,
-                 "maximum": 1_000_000.0, "default": -5.0, "step": 0.5},
-            ],
+                 "maximum": 1_000_000.0, "default": -5.0, "step": 0.5},],
             add_label="+ Add UDL",
-            empty_text="No uniform distributed loads defined.",
-        )
+            empty_text="No uniform distributed loads defined.",)
         content.addWidget(self.udl_table)
 
         uvl_label = QLabel("VARYING (UVL)")
@@ -320,13 +298,10 @@ class BeamAnalysisApp(QMainWindow):
                 {"label": "Start Intensity", "unit": "kN/m", "decimals": 2, "minimum": -1_000_000.0,
                  "maximum": 1_000_000.0, "default": 0.0, "step": 0.5},
                 {"label": "End Intensity", "unit": "kN/m", "decimals": 2, "minimum": -1_000_000.0,
-                 "maximum": 1_000_000.0, "default": -5.0, "step": 0.5},
-            ],
+                 "maximum": 1_000_000.0, "default": -5.0, "step": 0.5},],
             add_label="+ Add UVL",
-            empty_text="No uniformly varying loads defined.",
-        )
+            empty_text="No uniformly varying loads defined.",)
         content.addWidget(self.uvl_table)
-
         return frame
 
     def _build_history_card(self):
@@ -350,13 +325,10 @@ class BeamAnalysisApp(QMainWindow):
         view_all_btn.setCursor(Qt.PointingHandCursor)
         view_all_btn.clicked.connect(self.open_history_dialog)
         btn_row.addWidget(view_all_btn)
-
         content.addLayout(btn_row)
         return frame
 
-    # ------------------------------------------------------------------ #
     # Right: engineering viewport + results
-    # ------------------------------------------------------------------ #
     def _build_viewport(self):
         container = QWidget()
         v_layout = QVBoxLayout(container)
@@ -372,7 +344,6 @@ class BeamAnalysisApp(QMainWindow):
         h_layout.addWidget(title)
         h_layout.addStretch()
 
-        # A single Figure (not pyplot's global state) keeps this canvas
         # self-contained; plotting.py still owns everything drawn on it.
         self.figure = Figure(figsize=(8, 10))
         self.canvas = FigureCanvas(self.figure)
@@ -398,7 +369,6 @@ class BeamAnalysisApp(QMainWindow):
 
         canvas_scroll.setWidget(canvas_host)
         v_layout.addWidget(canvas_scroll, 1)
-
         return container
 
     def _build_results_card(self):
@@ -410,9 +380,7 @@ class BeamAnalysisApp(QMainWindow):
         content.addWidget(self.result_box)
         return frame
 
-    # ------------------------------------------------------------------ #
     # Behavior
-    # ------------------------------------------------------------------ #
     def toggle_beam_type(self):
         is_simply_supported = self.radio_simply.isChecked()
         self.supp_a_label.setVisible(is_simply_supported)
@@ -427,7 +395,7 @@ class BeamAnalysisApp(QMainWindow):
         self.supp_b_input.setMaximum(value)
 
     def new_model(self):
-        """Reset the model to a blank slate. Purely additive -- does not touch history.json."""
+        """Reset the model to a blank slate. Purely additive and does not touch history.json."""
         self.radio_simply.setChecked(True)
         self.beam_length_input.setValue(10.0)
         self.supp_a_input.setValue(0.0)
@@ -449,11 +417,11 @@ class BeamAnalysisApp(QMainWindow):
             if self.radio_cantilever.isChecked():
                 beam.add_event(0.0, Support(FIXED))
             else:
-                x_A = validate_support_location(str(self.supp_a_input.value()), 0.0, length, "Support A")
-                x_B = validate_support_location(str(self.supp_b_input.value()), length, length, "Support B")
-                validate_support_order(x_A, x_B)
-                beam.add_event(x_A, Support(PINNED))
-                beam.add_event(x_B, Support(ROLLER))
+                x_a = validate_support_location(str(self.supp_a_input.value()), 0.0, length, "Support A")
+                x_b = validate_support_location(str(self.supp_b_input.value()), length, length, "Support B")
+                validate_support_order(x_a, x_b)
+                beam.add_event(x_a, Support(PINNED))
+                beam.add_event(x_b, Support(ROLLER))
 
             for loc, mag in self.point_loads_table.get_rows():
                 validate_points(str(loc), length)
@@ -478,8 +446,7 @@ class BeamAnalysisApp(QMainWindow):
                 "max_shear_force": float(np.max(v_vals)),
                 "min_shear_force": float(np.min(v_vals)),
                 "max_bending_moment": float(np.max(m_vals)),
-                "min_bending_moment": float(np.min(m_vals)),
-            }
+                "min_bending_moment": float(np.min(m_vals)),}
 
             plot_beam_results(beam, x_vals, v_vals, m_vals, self.figure, reactions)
             self.canvas.draw()
@@ -491,11 +458,9 @@ class BeamAnalysisApp(QMainWindow):
                 x_grid=x_vals,
                 shear_force=v_vals,
                 bending_moment=m_vals,
-                summary_statistics=summary_stats
-            )
+                summary_statistics=summary_stats)
 
             self.refresh_history()
-
             self.result_box.setHtml(self._render_results_html(reactions, x_vals, v_vals, m_vals))
             self.status_bar.showMessage("Analysis complete", 5000)
 
@@ -553,12 +518,7 @@ class BeamAnalysisApp(QMainWindow):
         AboutDialog(self).exec_()
 
     def save_current_graph(self):
-        filename, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Graph",
-            "",
-            "PNG Image (*.png);;JPEG Image (*.jpg);;PDF (*.pdf)"
-        )
+        filename, _ = QFileDialog.getSaveFileName(self, "Save Graph", "", "PNG Image (*.png);;JPEG Image (*.jpg);;PDF (*.pdf)")
         if not filename:
             return
 
@@ -570,9 +530,7 @@ class BeamAnalysisApp(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to save graph: {str(e)}")
             self.status_bar.showMessage("Export failed", 4000)
 
-    # ------------------------------------------------------------------ #
     # Results panel rendering (presentation only -- no engineering logic)
-    # ------------------------------------------------------------------ #
     def _render_placeholder_html(self):
         p = PALETTE
         return f"""
@@ -604,8 +562,7 @@ class BeamAnalysisApp(QMainWindow):
                 f'<tr><td style="color:{p["text_secondary"]};padding:2px 10px 2px 0;">'
                 f'Reaction Moment</td>'
                 f'<td align="right" style="color:{p["text_primary"]};padding:2px 0;">'
-                f'{reactions["M_A"]:.2f} kNm</td></tr>'
-            )
+                f'{reactions["M_A"]:.2f} kNm</td></tr>')
         else:
             system_label = "Simply Supported"
             reactions_rows = (
@@ -616,8 +573,7 @@ class BeamAnalysisApp(QMainWindow):
                 f'<tr><td style="color:{p["text_secondary"]};padding:2px 10px 2px 0;">'
                 f'Support B (x = {reactions["x_B"]:.2f} m)</td>'
                 f'<td align="right" style="color:{p["text_primary"]};padding:2px 0;">'
-                f'{reactions["R_B"]:.2f} kN</td></tr>'
-            )
+                f'{reactions["R_B"]:.2f} kN</td></tr>')
 
         return f"""
         <div style="color:{p['text_primary']}; font-family:{MONO_FAMILY};">

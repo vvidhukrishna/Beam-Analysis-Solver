@@ -7,7 +7,6 @@ def test_beam_creation():
 
 def test_gocp_creates_point():
     beam = Beam(10.0)
-
     point = beam.get_or_create_point(3)
 
     assert point.x == 3
@@ -16,7 +15,6 @@ def test_gocp_creates_point():
 
 def test_gocp_sorts_points():
     beam = Beam(10.0)
-
     beam.get_or_create_point(7)
     beam.get_or_create_point(3)
 
@@ -26,7 +24,6 @@ def test_gocp_sorts_points():
 
 def test_gocp_reuses_point_within_tolerance():
     beam = Beam(10.0)
-
     original = beam.get_or_create_point(7)
     same_point = beam.get_or_create_point(7 + TOLERANCE / 10)
 
@@ -37,6 +34,7 @@ def test_add_event():
     beam = Beam(10.0)
     point = beam.get_or_create_point(7)
     beam.add_event(point.x, PointLoad(15))
+
     assert len(point.events) == 1
 
     event = point.events[0]
@@ -47,11 +45,9 @@ def test_add_event():
 
 def test_clear_reactions():
     beam = Beam(10.0)
-
     beam.add_event(0, Support(FIXED))
     beam.add_event(0, Reaction(15.0))
     beam.add_event(0, ReactionMoment(30.0))
-
     beam.add_event(5, PointLoad(-10.0))
 
     assert len(beam.get_or_create_point(0).events) == 3
@@ -82,12 +78,14 @@ def test_query_methods_filter_correctly():
 
     # Supports
     supports = list(beam.supports())
+
     assert len(supports) == 2
     assert supports[0][0] == 0  # x location
     assert isinstance(supports[0][1], Support)
 
     # Point Loads
     pt_loads = list(beam.point_loads())
+
     assert len(pt_loads) == 1
     assert pt_loads[0][0] == 5
     assert pt_loads[0][1].force == -20.0
@@ -95,6 +93,7 @@ def test_query_methods_filter_correctly():
 
     # Applied Moments
     moments = list(beam.applied_moments())
+
     assert len(moments) == 1
     assert moments[0][0] == 7
     assert moments[0][1].moment == 15.0
@@ -102,6 +101,7 @@ def test_query_methods_filter_correctly():
 
     # UDLs
     udls = list(beam.udls())
+
     assert len(udls) == 1
     assert isinstance(udls[0], UniformDistributedLoad)
     assert udls[0].start_x == 0
@@ -110,6 +110,7 @@ def test_query_methods_filter_correctly():
 
     # UVLs
     uvls = list(beam.uvls())
+
     assert len(uvls) == 1
     assert isinstance(uvls[0], UniformVaryingLoad)
     assert uvls[0].start_x == 5
@@ -131,9 +132,7 @@ def test_uvl_math():
 
     assert uvl.span == 15.0
     assert uvl.resultant_force == pytest.approx(-75.0)  # 0.5 * 15 * -10
-
-    # Centroid of a triangle from 0 to 15 leaning right is at 2/3 of the base
-    assert uvl.centroid_x == pytest.approx(10)
+    assert uvl.centroid_x == pytest.approx(10)  # Centroid of a triangle from 0 to 15 leaning right is at 2/3 of the base
 
 
 def test_equivalent_loads():
@@ -141,7 +140,6 @@ def test_equivalent_loads():
 
     beam.add_distributed_event(UniformDistributedLoad(0, 4, -10))
     beam.add_distributed_event(UniformVaryingLoad(4, 10, 0, -6))
-
     beam.add_event(3, PointLoad(-20))
     beam.add_event(7, AppliedMoment(15))
 

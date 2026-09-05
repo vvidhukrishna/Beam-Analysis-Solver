@@ -16,13 +16,10 @@ def validate_points(points_str: str, beam_length: float) -> list[float]:
     """Parses and validates point locations against the beam boundaries."""
     if not points_str.strip():
         return []
-
     pts = [float(val.strip()) for val in points_str.split(",")]
-
     for x in pts:
         if x < 0 or x > beam_length:
             raise ValueError(f"Point location x = {x}m must be between 0 and {beam_length}m.")
-
     return pts
 
 def validate_float_list(raw_input: str, expected_length: int, label: str) -> list[float]:
@@ -33,10 +30,7 @@ def validate_float_list(raw_input: str, expected_length: int, label: str) -> lis
 
     vals = [float(val.strip()) for val in raw_input.split(",")]
     if len(vals) != expected_length:
-        raise ValueError(
-            f"Length mismatch! Expected {expected_length} values for {label}, but got {len(vals)}."
-        )
-
+        raise ValueError(f"Length mismatch! Expected {expected_length} values for {label}, but got {len(vals)}.")
     return vals
 
 
@@ -55,18 +49,13 @@ def validate_udl_spec(raw_str: str, beam_length: float) -> tuple[float, float, f
         raise ValueError("UDL input requires exactly 3 values: start_x, end_x, intensity")
 
     start_x, end_x, intensity = parts
-
     if not (0 <= start_x < end_x <= beam_length):
-        raise ValueError(
-            f"Invalid UDL bounds ({start_x}m to {end_x}m). Must satisfy 0 <= start_x < end_x <= {beam_length}m."
-        )
-
+        raise ValueError(f"Invalid UDL bounds ({start_x}m to {end_x}m). Must satisfy 0 <= start_x < end_x <= {beam_length}m.")
     return start_x, end_x, intensity
 
 
 def validate_support_location(
-    loc_str: str, default: float, beam_length: float, support_name: str
-) -> float:
+    loc_str: str, default: float, beam_length: float, support_name: str) -> float:
     """Validates support position relative to beam span."""
     val = float(loc_str) if loc_str.strip() else default
     if not (0 <= val <= beam_length):
@@ -87,10 +76,8 @@ def validate_uvl_spec(raw_str: str, beam_length: float) -> tuple[float, float, f
         raise ValueError("UVL input requires exactly 4 values: start_x, end_x, w1, w2")
 
     start_x, end_x, w1, w2 = parts
-
     if not (0 <= start_x < end_x <= beam_length):
         raise ValueError(f"Invalid UVL bounds. Must satisfy 0 <= start_x < end_x <= {beam_length}m.")
-
     return start_x, end_x, w1, w2
 
 
@@ -150,6 +137,7 @@ def _check_complex_list(text, required_parts):
                         float(part)
                     except ValueError:
                         return "invalid"
+
             return "incomplete"
 
         if len(parts) > required_parts:

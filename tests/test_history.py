@@ -1,17 +1,13 @@
 import pytest
 import numpy as np
 from unittest.mock import MagicMock, patch
-from beam import (
-    Beam, Support, PointLoad, AppliedMoment,
-    UniformDistributedLoad, UniformVaryingLoad
-)
+from beam import (Beam, Support, PointLoad, AppliedMoment, UniformDistributedLoad, UniformVaryingLoad)
 import history
-
 
 @pytest.fixture
 def mock_history_file(tmp_path, monkeypatch):
     test_file = tmp_path / "test_history.json"
-    monkeypatch.setattr(history, "HISTORY_FILE", str(test_file))
+    monkeypatch.setattr(history, "history_file", str(test_file))
     return test_file
 
 
@@ -37,8 +33,7 @@ def sample_analysis_data():
         "max_shear_force": 1.0,
         "min_shear_force": -1.0,
         "max_bending_moment": 1.0,
-        "min_bending_moment": -1.0
-    }
+        "min_bending_moment": -1.0}
     return reactions, x_grid, v_grid, m_grid, stats
 
 

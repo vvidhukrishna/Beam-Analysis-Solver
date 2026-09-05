@@ -5,3 +5,5 @@ numpy>=1.23
 # Development / testing only
 pytest>=7.0
 pytest-qt>=4.2
+
+python-qt5
